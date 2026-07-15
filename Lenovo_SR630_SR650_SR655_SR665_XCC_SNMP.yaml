@@ -1,0 +1,1595 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+  - uuid: 0b8f45f148874812b5ffdeaf5202fd90
+    name: Templates/Servers Hardware
+  templates:
+  - uuid: 04a4f433db88474386d56416e18a7948
+    template: Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP
+    name: Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP
+    description: |-
+      SNMP template for Lenovo ThinkSystem SR630, SR650, SR655, SR665, HX650 and VX650 (all generations) via the XClarity Controller (XCC) SNMP agent, LENOVO-XCC-MIB (1.3.6.1.4.1.19046.11.1).
+      Autor: Frank Aguilieri
+      Versão: 2.1
+      Data: 15/07/2026
+      GitHub: https://github.com/frankaguilieri/Zabbix-Lenovo-ThinkSystem-SR630-SR650-SR655-SR665-HX650-VX650-by-XCC-SNMP
+
+      Coverage: memory, power supplies (PSU) + redundancy, disks (basic health plus per-drive stats: predictive failure, media errors, SSD remaining life, temperature), battery (RAID controller status/voltage/temperature and system battery via the voltage table), processor, fans (status + numeric speed), network interfaces, Fibre Channel HBA, power consumption (total + CPU/memory/other + available/remaining), temperature, voltage, GPU (inventory), firmware, LEDs, SNMP trap and availability (ICMP + SNMP).
+
+      =======================================================================
+      SERVER-SIDE CONFIGURATION (XCC) - required before the host will poll
+      =======================================================================
+      These ThinkSystem servers (XCC / XCC2) only provide an SNMPv3 agent for polling; SNMPv1/v2c is available for traps only. The management port is out-of-band and stays up even when the server is powered off.
+
+      1) GLOBAL SNMP AGENT - Web: BMC Configuration > Network > SNMP.
+         - Enable the SNMPv3 Agent.
+         - Fill in Contact and Location (mandatory - the agent will NOT persist without them).
+         - CLI equivalent (SSH into the XCC): snmp -a3 enabled -l <location> -cn <contact>
+         - Verify with 'snmp' (no args); it must show '-a3 enabled'.
+
+      2) GLOBAL SECURITY - disable forced password change at first login.
+         A freshly created/default account is in a 'must change password at first login' state and will NOT authenticate over SNMP until that is cleared. Disable it so the monitoring account is usable non-interactively:
+         - Web: BMC Configuration > Security > (Password/Account Security Level or Global Login Settings) > turn OFF 'Force user to change password on first access' (a.k.a. 'Change password at first login').
+         - Also make sure the monitoring account's password is set and not expired.
+
+      3) MONITORING USER - create a read-only account with SNMP access and SNMPv3 auth/priv.
+         On this firmware family the SNMPv3 authentication passphrase is the account login password (-p) and only the privacy passphrase is set separately (-spw). Configure via CLI (adjust the account index shown by 'users'):
+           users -N <index> -p "<LOGIN/AUTH_PASS>" -ai web|ssh|snmp -sauth HMAC-SHA -spriv AES -spw "<PRIV_PASS>" -sacc Get
+         - '-ai ...|snmp' grants SNMP to the account; '-sacc Get' makes it read-only.
+         - -sauth HMAC-SHA  => authentication protocol SHA-1.
+         - -spriv AES       => privacy protocol AES-128.
+         - Both passphrases must be >= 8 characters.
+         - The web 'SNMP Settings' toggle on the user often reverts if auth/priv are incomplete; the CLI form above persists reliably.
+         - Verify with 'users' (the account must show the 'snmp' attribute).
+
+      4) TRAPS (optional) - BMC Configuration > Notification > SNMP Trap; point the destination to the Zabbix server/proxy IP (UDP 162).
+
+      5) VALIDATE from the Zabbix server/proxy before creating the host:
+           SNMPCONFPATH=/dev/null snmpget -v3 -l authPriv -u <user> -a SHA -A "<AUTH_PASS>" -x AES -X "<PRIV_PASS>" <XCC_IP> 1.3.6.1.2.1.1.1.0
+
+      =======================================================================
+      ZABBIX-SIDE CONFIGURATION - Host SNMP interface (SNMPv3)
+      =======================================================================
+      Create the host pointing to the XCC management IP (NOT the OS IP) and add an SNMP interface. In the interface, set SNMP version = SNMPv3 and fill the security fields to match EXACTLY what worked in the snmpget above:
+
+         Field (Zabbix)            Value
+         -----------------------  -------------------------------------------
+         SNMP version             SNMPv3
+         Context name             (leave empty)
+         Security name            <monitoring user, e.g. zabbix_mon>
+         Security level           authPriv
+         Authentication protocol  SHA1        (XCC uses HMAC-SHA = SHA-1; do NOT use SHA224/256/384/512)
+         Authentication passphrase <the account login password / -A value>
+         Privacy protocol         AES128      (XCC uses AES; do NOT use AES192/256 or DES)
+         Privacy passphrase       <the -X / -spw value>
+
+      IMPORTANT: these ThinkSystem XCCs only support SHA-1 for authentication and AES-128 for privacy on the user profile. Selecting SHA256/AES256 in Zabbix will fail authentication/decryption even though the credentials are 'correct'. Any mismatch here reproduces errors like 'Unknown user name', 'authentication failure' or 'decryption error'.
+
+      You can hard-code these values on the interface or reference macros and set them per host, e.g. Security name = {$SNMPV3_USER}, Auth passphrase = {$SNMPV3_AUTHPASS}, Priv passphrase = {$SNMPV3_PRIVPASS} (define them on the host, ideally as Secret macros). Then link this template and adjust the tuning macros ({$POWER_MAX}, temperature thresholds, {$HBA_FC.NAME_MATCHES} / {$HBA_FC.NAME_NOT_MATCHES}, {$GPU.NAME_MATCHES}, {$DRIVE_LIFE_WARN}, etc.).
+
+      NOTES:
+      - Fuel-gauge and drive-stat OIDs come from the LENOVO-XCC-MIB but vary by model/firmware (e.g. SR665 does not expose fuelGaugePowerRemaining, SR655 does); validate via snmpwalk.
+      - Disks/RAID require raidOOBCapable enabled (a dedicated item monitors this).
+      - HBA FC discovery reuses the adapter-port table filtered by name: a port must match {$HBA_FC.NAME_MATCHES} AND must not match {$HBA_FC.NAME_NOT_MATCHES}. This keeps Ethernet NICs from Broadcom/Emulex/QLogic (which also make FC HBAs) out of the HBA rule. On some firmwares the HBA is not exposed over SNMP and needs Redfish/REST.
+      - GPU: the MIB exposes inventory only (name/memory). GPU health/temperature are not available over SNMP; they require Redfish/REST.
+      - Network interface here = adapter/link status (not traffic/errors). For bps/errors use the IF-MIB on the OS or the switch.
+      - Component alerts (fan, overall health, memory, CPU, disk, voltage) are suppressed while the server is powered off (dependency on the 'Server is powered off' trigger).
+      - PSU redundancy: the calculated item psu.failed.count sums the supply health codes; the redundancy trigger fires with 2+ supplies installed and at least one degraded.
+    vendor:
+      name: Custom
+      version: '2.1'
+    groups:
+    - name: Templates/Servers Hardware
+    items:
+    - name: 'XCC: ICMP ping'
+      type: SIMPLE
+      key: icmpping
+      delay: 1m
+      history: 7d
+      trends: 90d
+      value_type: UNSIGNED
+      description: ICMP availability of the management IP (XCC/BMC).
+      tags:
+      - tag: component
+        value: availability
+      uuid: 5693037d0504438ca29c4bb151e313a6
+    - name: 'XCC: ICMP loss'
+      type: SIMPLE
+      key: icmppingloss
+      delay: 1m
+      history: 7d
+      trends: 90d
+      value_type: FLOAT
+      units: '%'
+      tags:
+      - tag: component
+        value: availability
+      uuid: 425e290440dc47a38012080d063cb2e6
+    - name: 'XCC: ICMP response time'
+      type: SIMPLE
+      key: icmppingsec
+      delay: 1m
+      history: 7d
+      trends: 90d
+      value_type: FLOAT
+      units: s
+      tags:
+      - tag: component
+        value: availability
+      uuid: 9045b5b414c249d1bbc81e7c3f83ecd5
+    - name: SNMP availability
+      type: INTERNAL
+      key: zabbix[host,snmp,available]
+      delay: 1m
+      history: 7d
+      trends: 90d
+      value_type: UNSIGNED
+      description: Availability state of the host SNMP interface in Zabbix.
+      valuemap:
+        name: snmp availability
+      tags:
+      - tag: component
+        value: availability
+      uuid: fd15366dbf344d58a5aa3f3ebcb88313
+    - name: Overall System Health Status
+      type: SNMP_AGENT
+      snmp_oid: .1.3.6.1.4.1.19046.11.1.1.4.1.0
+      key: system.health.status
+      delay: 2m
+      history: 7d
+      trends: 90d
+      description: LENOVO-XCC-MIB::systemHealthStat (.1.1.4.1). Overall health status reported by the XCC.
+      valuemap:
+        name: systemHealthStat
+      preprocessing:
+      - type: DISCARD_UNCHANGED_HEARTBEAT
+        parameters:
+        - 1h
+      tags:
+      - tag: component
+        value: health
+      uuid: e09f6e0e74d84dd2b3d583b3128ba3f6
+    - name: System power state
+      type: SNMP_AGENT
+      snmp_oid: .1.3.6.1.4.1.19046.11.1.5.1.1.0
+      key: system.power.state
+      delay: 2m
+      history: 7d
+      trends: 90d
+      valuemap:
+        name: currentSysPowerStatus
+      preprocessing:
+      - type: DISCARD_UNCHANGED_HEARTBEAT
+        parameters:
+        - 1h
+      tags:
+      - tag: component
+        value: power
+      uuid: 9b2220b4bd9c4af597141496ae5bd951
+    - name: System state (POST/boot)
+      type: SNMP_AGENT
+      snmp_oid: .1.3.6.1.4.1.19046.11.1.5.1.4.0
+      key: system.state
+      delay: 5m
+      history: 7d
+      trends: 90d
+      valuemap:
+        name: systemState
+      preprocessing:
+      - type: DISCARD_UNCHANGED_HEARTBEAT
+        parameters:
+        - 1h
+      tags:
+      - tag: component
+        value: health
+      uuid: 6ebf5542ae9e402192c539419dda1282
+    - name: Machine Type
+      type: SNMP_AGENT
+      snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.2.1.1.0
+      key: machine.type
+      delay: 1h
+      history: 7d
+      trends: '0'
+      value_type: TEXT
+      preprocessing:
+      - type: DISCARD_UNCHANGED_HEARTBEAT
+        parameters:
+        - 1h
+      tags:
+      - tag: component
+        value: inventory
+      uuid: 1e293a8491ef413f98f8ea1b569a49de
+    - name: Machine Model
+      type: SNMP_AGENT
+      snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.2.1.2.0
+      key: machine.model
+      delay: 1h
+      history: 7d
+      trends: '0'
+      value_type: TEXT
+      preprocessing:
+      - type: DISCARD_UNCHANGED_HEARTBEAT
+        parameters:
+        - 1h
+      tags:
+      - tag: component
+        value: inventory
+      uuid: 510f2c73d14b42a7b8b69c090b91d537
+    - name: Machine Serial Number
+      type: SNMP_AGENT
+      snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.2.1.3.0
+      key: machine.serial
+      delay: 1h
+      history: 7d
+      trends: '0'
+      value_type: TEXT
+      preprocessing:
+      - type: DISCARD_UNCHANGED_HEARTBEAT
+        parameters:
+        - 1h
+      tags:
+      - tag: component
+        value: inventory
+      uuid: 65feda579a1f4dc2ab840338dbe32494
+    - name: Machine Name
+      type: SNMP_AGENT
+      snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.2.1.5.0
+      key: machine.name
+      delay: 1h
+      history: 7d
+      trends: '0'
+      value_type: TEXT
+      preprocessing:
+      - type: DISCARD_UNCHANGED_HEARTBEAT
+        parameters:
+        - 1h
+      tags:
+      - tag: component
+        value: inventory
+      uuid: 743fd0d938844754ab29c0313561d2fa
+    - name: Fans installed (total)
+      type: SNMP_AGENT
+      snmp_oid: 1.3.6.1.4.1.19046.11.1.1.3.1.0
+      key: fan.total
+      delay: 10m
+      history: 7d
+      trends: 90d
+      tags:
+      - tag: component
+        value: fan
+      uuid: 75d4531c17964ef9bf07f092b57a2343
+    - name: Total power in use
+      type: SNMP_AGENT
+      snmp_oid: .1.3.6.1.4.1.19046.11.1.1.10.1.10.0
+      key: power.consumption
+      delay: 1m
+      history: 30d
+      trends: 400d
+      value_type: FLOAT
+      units: W
+      description: LENOVO-XCC-MIB::fuelGaugeTotalPowerInUse. Current total power draw in Watts.
+      tags:
+      - tag: component
+        value: power
+      uuid: 472f0418fb5240d692ea7e965587414a
+    - name: Power consumption - CPU
+      type: SNMP_AGENT
+      snmp_oid: .1.3.6.1.4.1.19046.11.1.1.10.1.11.0
+      key: power.consumption.cpu
+      delay: 2m
+      history: 14d
+      trends: 180d
+      value_type: FLOAT
+      units: W
+      description: LENOVO-XCC-MIB::fuelGaugePowerConsumptionCpu
+      tags:
+      - tag: component
+        value: power
+      uuid: 1d4906f874a6400abda3474fbf949f8b
+    - name: Power consumption - Memory
+      type: SNMP_AGENT
+      snmp_oid: .1.3.6.1.4.1.19046.11.1.1.10.1.12.0
+      key: power.consumption.memory
+      delay: 2m
+      history: 14d
+      trends: 180d
+      value_type: FLOAT
+      units: W
+      description: LENOVO-XCC-MIB::fuelGaugePowerConsumptionMemory
+      tags:
+      - tag: component
+        value: power
+      uuid: de1d865f28794992b1a75f942cb83402
+    - name: Power consumption - Other
+      type: SNMP_AGENT
+      snmp_oid: .1.3.6.1.4.1.19046.11.1.1.10.1.13.0
+      key: power.consumption.other
+      delay: 2m
+      history: 14d
+      trends: 180d
+      value_type: FLOAT
+      units: W
+      description: LENOVO-XCC-MIB::fuelGaugePowerConsumptionOther
+      tags:
+      - tag: component
+        value: power
+      uuid: fdfa0791c89c4dc9a7c4cfb9888635e5
+    - name: Total power available (PSUs)
+      type: SNMP_AGENT
+      snmp_oid: .1.3.6.1.4.1.19046.11.1.1.10.1.9.0
+      key: power.available
+      delay: 10m
+      history: 14d
+      trends: 180d
+      value_type: FLOAT
+      units: W
+      description: LENOVO-XCC-MIB::fuelGaugeTotalPowerAvailable. Total power-supply capacity.
+      tags:
+      - tag: component
+        value: power
+      uuid: 13460b9e041047dcab4c3b2f5e043954
+    - name: Remaining power headroom
+      type: CALCULATED
+      key: power.remaining
+      params: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/power.available)-last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/power.consumption)
+      delay: 10m
+      history: 14d
+      trends: 180d
+      value_type: FLOAT
+      units: W
+      description: 'Calculated: available power (fuelGaugeTotalPowerAvailable) minus total power in use (fuelGaugeTotalPowerInUse). Replaces fuelGaugePowerRemaining, which not all models expose (SR665 does not, SR655 does). Interval aligned to 10m (the slowest input) so it is not evaluated before inputs have collected.'
+      preprocessing:
+      - type: CHECK_NOT_SUPPORTED
+        parameters:
+        - '-1'
+        error_handler: DISCARD_VALUE
+      tags:
+      - tag: component
+        value: power
+      uuid: 4cf8e64ba8d2463ba81fde8c01686ab8
+    - name: 'PSU: total installed'
+      type: SNMP_AGENT
+      snmp_oid: .1.3.6.1.4.1.19046.11.1.1.11.1.0
+      key: psu.installed.count
+      delay: 10m
+      history: 7d
+      trends: 90d
+      value_type: UNSIGNED
+      description: LENOVO-XCC-MIB::powerNumber. Number of installed power supplies.
+      tags:
+      - tag: component
+        value: psu
+      uuid: 502580fc7fcb4cc0b73d5bdfb626cfed
+    - name: 'PSU: failed supplies (count)'
+      type: CALCULATED
+      key: psu.failed.count
+      delay: 3m
+      history: 7d
+      trends: 90d
+      value_type: UNSIGNED
+      params: sum(last_foreach(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/psu.health.code[*]))
+      description: Sum of power-supply health codes (0=Normal, 1=not Normal). Basis for redundancy-loss detection. If no supply has been discovered yet (empty foreach), returns 0 via error handling.
+      preprocessing:
+      - type: CHECK_NOT_SUPPORTED
+        parameters:
+        - '-1'
+        error_handler: CUSTOM_VALUE
+        error_handler_params: '0'
+      tags:
+      - tag: component
+        value: psu
+      uuid: 496d784b53fa4f5aa17b5522c36d9ded
+    - name: Power On Hours
+      type: SNMP_AGENT
+      snmp_oid: .1.3.6.1.4.1.19046.11.1.5.1.2.0
+      key: system.power_on_hours
+      delay: 1h
+      history: 7d
+      trends: 90d
+      units: uptime
+      tags:
+      - tag: component
+        value: health
+      uuid: 8c9495cc5d1c485ebaf028e01de79a5b
+    - name: XCC Restart Count
+      type: SNMP_AGENT
+      snmp_oid: .1.3.6.1.4.1.19046.11.1.5.1.3.0
+      key: xcc.restart_count
+      delay: 10m
+      history: 30d
+      trends: 90d
+      tags:
+      - tag: component
+        value: health
+      uuid: 002a230911874f5ebdc4f4cdfe08e8c7
+    - name: RAID Out-of-band capable
+      type: SNMP_AGENT
+      snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.1.0
+      key: raid.oob_capable
+      delay: 1h
+      history: 7d
+      trends: 90d
+      description: If disabled, RAID/disk items over SNMP will not be available.
+      valuemap:
+        name: raidoobcapable
+      preprocessing:
+      - type: DISCARD_UNCHANGED_HEARTBEAT
+        parameters:
+        - 1h
+      tags:
+      - tag: component
+        value: storage
+      uuid: 8b20877caf594fad97cedf360586bdeb
+    - name: SNMP Trap (XCC)
+      type: SNMP_TRAP
+      key: snmptrap["Lenovo XCC"]
+      delay: '0'
+      history: 90d
+      trends: '0'
+      value_type: LOG
+      logtimefmt: hh:mm:ss yyyy/MM/dd
+      description: XCC SNMP traps (real-time events). Configure the destination under BMC Configuration > Notification > SNMP Trap.
+      tags:
+      - tag: component
+        value: health
+      uuid: 01ba88aa65f543989357d95cc0db0782
+    discovery_rules:
+    - name: Fan Discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#FANINDEX},1.3.6.1.4.1.19046.11.1.1.3.2.1.1]
+      key: fan.discovery
+      description: LENOVO-XCC-MIB::fanIndex
+      uuid: acb3ed0fa331401e9c556138d5c9b2ea
+      lifetime: 30d
+      enabled_lifetime_type: DISABLE_NEVER
+      item_prototypes:
+      - name: 'Fan {#FANINDEX}: Description'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.3.2.1.2.{#FANINDEX}
+        key: fan.descr[{#FANINDEX}]
+        history: 7d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: fan
+        uuid: 0bca45e556a840fb8452504a21f0b493
+      - name: 'Fan {#FANINDEX}: Speed raw'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.3.2.1.3.{#FANINDEX}
+        key: fan.speed.raw[{#FANINDEX}]
+        history: 7d
+        value_type: TEXT
+        trends: '0'
+        description: String 'ddd% of maximum' or 'Offline'.
+        tags:
+        - tag: component
+          value: fan
+        uuid: d81bd108a450489ca116f960de75a5c0
+      - name: 'Fan {#FANINDEX}: Speed'
+        type: DEPENDENT
+        key: fan.speed[{#FANINDEX}]
+        master_item:
+          key: fan.speed.raw[{#FANINDEX}]
+        history: 7d
+        trends: 90d
+        value_type: UNSIGNED
+        units: '%'
+        description: Fan speed as a percentage of maximum RPM, extracted from the string. "Offline" is discarded.
+        preprocessing:
+        - type: REGEX
+          parameters:
+          - (\d+)\s*%
+          - \1
+          error_handler: DISCARD_VALUE
+        tags:
+        - tag: component
+          value: fan
+        uuid: 724cad261baf4c1fa9d2dc78a5de8e94
+      - name: 'Fan {#FANINDEX}: Health status'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.3.2.1.10.{#FANINDEX}
+        key: fan.status[{#FANINDEX}]
+        history: 30d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: fan
+        uuid: 5de3b6cb76b844d297c5f27ac67dfcbe
+        trigger_prototypes:
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/fan.status[{#FANINDEX}],,,"{$FAN_OK_STATUS}")=0
+          name: 'Fan {#FANINDEX}: not in OK state'
+          priority: WARNING
+          manual_close: 'YES'
+          uuid: 023ab4984f584808a6e3f5cc132e1fa4
+          dependencies:
+          - name: Server is powered off
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+    - name: Memory Module Discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#MEMINDEX},1.3.6.1.4.1.19046.11.1.1.5.21.1.1,{#MEMDESCR},1.3.6.1.4.1.19046.11.1.1.5.21.1.2,{#MEMTYPE},1.3.6.1.4.1.19046.11.1.1.5.21.1.6]
+      key: memory.discovery
+      description: LENOVO-XCC-MIB::systemMemoryVpdTable
+      uuid: 672ec88901c5490f95a6749d4bf7643d
+      lifetime: 30d
+      enabled_lifetime_type: DISABLE_NEVER
+      item_prototypes:
+      - name: '{#MEMDESCR} ({#MEMTYPE}): Status'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.21.1.8.{#MEMINDEX}
+        key: memory.status[{#MEMINDEX}]
+        history: 30d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: memory
+        uuid: 3013179abbb24efb909cff89a176d16d
+        trigger_prototypes:
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/memory.status[{#MEMINDEX}],,,"Normal")=0
+          name: '{#MEMDESCR} ({#MEMTYPE}): memory module is not in Normal state'
+          priority: AVERAGE
+          manual_close: 'YES'
+          uuid: 43457f2c393344b49abdd3657b3690b3
+          dependencies:
+          - name: Server is powered off
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+      - name: '{#MEMDESCR} ({#MEMTYPE}): Size'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.21.1.7.{#MEMINDEX}
+        key: memory.size[{#MEMINDEX}]
+        history: 7d
+        trends: 90d
+        units: '!GB'
+        tags:
+        - tag: component
+          value: memory
+        uuid: f50130a7362a4ba9975eb4c65adb75a8
+      - name: '{#MEMDESCR} ({#MEMTYPE}): Speed'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.21.1.9.{#MEMINDEX}
+        key: memory.speed[{#MEMINDEX}]
+        history: 7d
+        trends: 90d
+        units: '!MHz'
+        tags:
+        - tag: component
+          value: memory
+        uuid: 9f8aa25b77ce46f8be063096cdd62f32
+      - name: '{#MEMDESCR} ({#MEMTYPE}): Serial Number'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.21.1.4.{#MEMINDEX}
+        key: memory.serial[{#MEMINDEX}]
+        history: 7d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: memory
+        uuid: a19cf46f1d384d89bbbe8709ec850f8e
+      - name: '{#MEMDESCR} ({#MEMTYPE}): Part Number'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.21.1.11.{#MEMINDEX}
+        key: memory.partnumber[{#MEMINDEX}]
+        history: 7d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: memory
+        uuid: 099cac63be6740a58ae858e504570d1c
+    - name: Processor Discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#CPUINDEX},1.3.6.1.4.1.19046.11.1.1.5.20.1.1,{#CPUMODEL},1.3.6.1.4.1.19046.11.1.1.5.20.1.12]
+      key: cpu.discovery
+      description: LENOVO-XCC-MIB::systemCPUVpdTable
+      uuid: 60669cd8b7324fb4bc3bf8770141c499
+      lifetime: 30d
+      enabled_lifetime_type: DISABLE_NEVER
+      item_prototypes:
+      - name: 'CPU {#CPUINDEX} ({#CPUMODEL}): Status'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.20.1.11.{#CPUINDEX}
+        key: cpu.status[{#CPUINDEX}]
+        history: 30d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: cpu
+        uuid: 3688f4b30e0c4e80be9c11c5fdd9e4aa
+        trigger_prototypes:
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/cpu.status[{#CPUINDEX}],,,"Normal")=0
+          name: 'CPU {#CPUINDEX} ({#CPUMODEL}): processor is not in Normal state'
+          priority: HIGH
+          manual_close: 'YES'
+          uuid: dfbaab0be1bc47869f5af0d45d563913
+          dependencies:
+          - name: Server is powered off
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+      - name: 'CPU {#CPUINDEX} ({#CPUMODEL}): Core count'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.20.1.7.{#CPUINDEX}
+        key: cpu.cores[{#CPUINDEX}]
+        history: 7d
+        trends: 90d
+        tags:
+        - tag: component
+          value: cpu
+        uuid: caea7dc5c7694866b57e5e0d63c33346
+    - name: Physical Disk Discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#DISKNAME},.1.3.6.1.4.1.19046.11.1.1.12.2.1.2]
+      key: physicaldisk.discovery
+      description: LENOVO-XCC-MIB::diskTable (requires raidOOBCapable enabled)
+      uuid: 85f68f27a5364b9383449c6aa989cead
+      lifetime: 30d
+      enabled_lifetime_type: DISABLE_NEVER
+      item_prototypes:
+      - name: 'Disk {#DISKNAME}: Health status'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.12.2.1.3.{#SNMPINDEX}
+        key: disk.status[{#SNMPINDEX}]
+        delay: 3m
+        history: 30d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        description: LENOVO-XCC-MIB::diskHealthStatus
+        tags:
+        - tag: component
+          value: disk
+        uuid: c20901b667b44bc2a25d5b49aa11757b
+        trigger_prototypes:
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/disk.status[{#SNMPINDEX}],,,"{$DISK_OK_STATUS}")=0
+          name: 'Disk {#DISKNAME}: physical disk is not in OK state'
+          priority: HIGH
+          manual_close: 'YES'
+          uuid: 4c13fdf3666e412a98b75042ac448e8a
+          dependencies:
+          - name: Server is powered off
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+      - name: 'Disk {#DISKNAME}: FRU name'
+        type: SNMP_AGENT
+        snmp_oid: .1.3.6.1.4.1.19046.11.1.1.12.2.1.2.{#SNMPINDEX}
+        key: disk.fru[{#SNMPINDEX}]
+        delay: 1h
+        history: 14d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: disk
+        uuid: 58bc4a3b8f794b5fa21ec05b425dde9e
+    - name: RAID Drive Discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#DRVNAME},1.3.6.1.4.1.19046.11.1.1.13.1.3.1.2,{#DRVSLOT},1.3.6.1.4.1.19046.11.1.1.13.1.3.1.5]
+      key: raiddrive.discovery
+      description: LENOVO-XCC-MIB::raidDriveTable. Detailed per-drive statistics behind the RAID controller.
+      uuid: 98069208d2fb452c87ddda477b55473f
+      lifetime: 30d
+      enabled_lifetime_type: DISABLE_NEVER
+      item_prototypes:
+      - name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): Health status'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.3.1.11.{#SNMPINDEX}
+        key: raiddrive.health[{#SNMPINDEX}]
+        delay: 3m
+        history: 30d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: disk
+        uuid: 5713810c9eac49369a27d53bd4cbc41a
+        trigger_prototypes:
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/raiddrive.health[{#SNMPINDEX}],,,"Normal")=0 and length(last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/raiddrive.health[{#SNMPINDEX}]))>0
+          name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): RAID drive is not healthy'
+          priority: HIGH
+          manual_close: 'YES'
+          uuid: 200208c164584a35be2e5dec5193d490
+          dependencies:
+          - name: Server is powered off
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+      - name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): State'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.3.1.4.{#SNMPINDEX}
+        key: raiddrive.state[{#SNMPINDEX}]
+        delay: 3m
+        history: 30d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: disk
+        uuid: 5ef57ab832d94ef9badcca3ce845bda2
+      - name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): Predictive failure count'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.3.1.24.{#SNMPINDEX}
+        key: raiddrive.predfail[{#SNMPINDEX}]
+        delay: 10m
+        history: 30d
+        trends: 180d
+        value_type: UNSIGNED
+        tags:
+        - tag: component
+          value: disk
+        uuid: 9475716bde524804a64eac2028cf3b1b
+        trigger_prototypes:
+        - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/raiddrive.predfail[{#SNMPINDEX}])>0
+          name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): predictive failure count > 0'
+          priority: HIGH
+          description: The controller reported a predictive failure. Plan drive replacement.
+          manual_close: 'YES'
+          uuid: 5813eb601b1941089a586868f47b60a9
+          dependencies:
+          - name: Server is powered off
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+      - name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): Media error count'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.3.1.22.{#SNMPINDEX}
+        key: raiddrive.mediaerr[{#SNMPINDEX}]
+        delay: 10m
+        history: 30d
+        trends: 180d
+        value_type: UNSIGNED
+        tags:
+        - tag: component
+          value: disk
+        uuid: bce4b8607daf404696a1c50b2e380fd3
+      - name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): Remaining life'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.3.1.25.{#SNMPINDEX}
+        key: raiddrive.life[{#SNMPINDEX}]
+        delay: 1h
+        history: 30d
+        trends: 365d
+        value_type: UNSIGNED
+        units: '%'
+        description: Remaining life (SSD). May return empty on HDDs; in that case the value is discarded.
+        preprocessing:
+        - type: REGEX
+          parameters:
+          - (\d+)
+          - \1
+          error_handler: DISCARD_VALUE
+        tags:
+        - tag: component
+          value: disk
+        uuid: 110f5ecb279e44259115c958f9b2f74c
+        trigger_prototypes:
+        - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/raiddrive.life[{#SNMPINDEX}])<{$DRIVE_LIFE_WARN}
+          name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): SSD remaining life < {$DRIVE_LIFE_WARN}%'
+          priority: WARNING
+          manual_close: 'YES'
+          uuid: 58ac89708b734bfabec17e46d044b123
+          dependencies:
+          - name: Server is powered off
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+      - name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): Temperature'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.3.1.10.{#SNMPINDEX}
+        key: raiddrive.temp[{#SNMPINDEX}]
+        delay: 5m
+        history: 14d
+        trends: 180d
+        value_type: FLOAT
+        units: °C
+        preprocessing:
+        - type: REGEX
+          parameters:
+          - (\d+)
+          - \1
+          error_handler: DISCARD_VALUE
+        tags:
+        - tag: component
+          value: disk
+        uuid: 8a506a07e919480b92d3ed4c8184abb1
+    - name: Power Supply Discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#PSUNAME},.1.3.6.1.4.1.19046.11.1.1.11.2.1.2]
+      key: psu.discovery
+      delay: 1h
+      description: LENOVO-XCC-MIB::powerFruName
+      uuid: 089089471c0346e1b7d829fc3c3c95f3
+      lifetime: 30d
+      enabled_lifetime_type: DISABLE_NEVER
+      item_prototypes:
+      - name: 'PSU {#PSUNAME}: Health status'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.11.2.1.6.{#SNMPINDEX}
+        key: psu.status[{#SNMPINDEX}]
+        delay: 3m
+        history: 30d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        description: LENOVO-XCC-MIB::powerHealthStatus
+        tags:
+        - tag: component
+          value: psu
+        uuid: f792ef4d00364842b5099393f3132616
+        trigger_prototypes:
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/psu.status[{#SNMPINDEX}],,,"{$PSU_OK_STATUS}")=0
+          name: 'PSU {#PSUNAME}: power supply is not in Normal state'
+          priority: HIGH
+          manual_close: 'YES'
+          uuid: a1a79e55a5294b509349ca60933c14b9
+      - name: 'PSU {#PSUNAME}: Health code'
+        type: DEPENDENT
+        key: psu.health.code[{#SNMPINDEX}]
+        master_item:
+          key: psu.status[{#SNMPINDEX}]
+        history: 7d
+        trends: '0'
+        value_type: UNSIGNED
+        description: 0 if Normal, 1 otherwise. Feeds the calculated item psu.failed.count.
+        preprocessing:
+        - type: JAVASCRIPT
+          parameters:
+          - return (String(value).trim()==='Normal')?0:1;
+        tags:
+        - tag: component
+          value: psu
+        uuid: a783f2c88bd64f7b87dbe0c79bee5cb0
+      - name: 'PSU {#PSUNAME}: FRU name'
+        type: SNMP_AGENT
+        snmp_oid: .1.3.6.1.4.1.19046.11.1.1.11.2.1.2.{#SNMPINDEX}
+        key: psu.fru[{#SNMPINDEX}]
+        delay: 1h
+        history: 14d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: psu
+        uuid: dbc938a4f38b43e0b79fe37f66488112
+    - name: Network Adapter Discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#NETINDEX},1.3.6.1.4.1.19046.11.1.1.14.4.1.1,{#NETNAME},1.3.6.1.4.1.19046.11.1.1.14.4.1.2]
+      key: network.adapter.discovery
+      description: LENOVO-XCC-MIB::adapterNetworkPortTable. Ethernet ports (Fibre Channel HBAs excluded by filter).
+      filter:
+        conditions:
+        - macro: '{#NETNAME}'
+          value: '{$HBA_FC.NAME_MATCHES}'
+          operator: NOT_MATCHES_REGEX
+          formulaid: A
+      uuid: 5de53c444a93442da6dbe467d51b3177
+      lifetime: 30d
+      enabled_lifetime_type: DISABLE_NEVER
+      item_prototypes:
+      - name: 'NIC {#NETNAME}: Link status'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.14.4.1.20.{#NETINDEX}
+        key: net.link.status[{#NETINDEX}]
+        history: 30d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: network
+        uuid: 7c2f7b7aadeb493686d7fc03188c1c15
+        trigger_prototypes:
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/net.link.status[{#NETINDEX}],,,"Down")=1
+          name: 'NIC {#NETNAME}: link is Down'
+          priority: AVERAGE
+          description: Disable for ports intentionally left uncabled.
+          manual_close: 'YES'
+          uuid: 949c12825be94f5d9528d37431caf493
+      - name: 'NIC {#NETNAME}: Link speed'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.14.4.1.21.{#NETINDEX}
+        key: net.link.speed[{#NETINDEX}]
+        history: 7d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: network
+        uuid: 989b0c8820d84959923deb88b26ad766
+      - name: 'NIC {#NETNAME}: MAC (burned-in)'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.14.4.1.5.{#NETINDEX}
+        key: net.mac[{#NETINDEX}]
+        delay: 1h
+        history: 14d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: network
+        uuid: b7c1511bfc9e4335a6ed469f03fa11c8
+    - name: HBA Fibre Channel Discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#HBAINDEX},1.3.6.1.4.1.19046.11.1.1.14.4.1.1,{#HBANAME},1.3.6.1.4.1.19046.11.1.1.14.4.1.2]
+      key: hba.fc.discovery
+      description: Adapter ports that MATCH {$HBA_FC.NAME_MATCHES} and do NOT match {$HBA_FC.NAME_NOT_MATCHES} (which excludes Ethernet/NIC cards). Validate via snmpwalk on 1.3.6.1.4.1.19046.11.1.1.14.4.1.2; if the XCC does not expose the HBA over SNMP, complement with Redfish/REST.
+      filter:
+        evaltype: AND
+        conditions:
+        - macro: '{#HBANAME}'
+          value: '{$HBA_FC.NAME_MATCHES}'
+          operator: MATCHES_REGEX
+          formulaid: A
+        - macro: '{#HBANAME}'
+          value: '{$HBA_FC.NAME_NOT_MATCHES}'
+          operator: NOT_MATCHES_REGEX
+          formulaid: B
+      uuid: fac65af9c24a48d7b3bbaae8ffaa5bb2
+      lifetime: 30d
+      enabled_lifetime_type: DISABLE_NEVER
+      item_prototypes:
+      - name: 'HBA FC {#HBANAME}: Link status'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.14.4.1.20.{#HBAINDEX}
+        key: hba.fc.link.status[{#HBAINDEX}]
+        history: 30d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: hba-fc
+        uuid: 23c4c82837b543bba8e316f75aa5b5a2
+        trigger_prototypes:
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/hba.fc.link.status[{#HBAINDEX}],,,"Down")=1
+          name: 'HBA FC {#HBANAME}: link is Down'
+          priority: AVERAGE
+          manual_close: 'YES'
+          uuid: 0f939745a74449de965f7e39af5300ec
+      - name: 'HBA FC {#HBANAME}: Link speed'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.14.4.1.21.{#HBAINDEX}
+        key: hba.fc.link.speed[{#HBAINDEX}]
+        history: 7d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: hba-fc
+        uuid: 32bc061912b34893914ce50276cc1f08
+      - name: 'HBA FC {#HBANAME}: WWPN (FC address)'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.14.4.1.16.{#HBAINDEX}
+        key: hba.fc.wwpn[{#HBAINDEX}]
+        delay: 1h
+        history: 14d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        description: LENOVO-XCC-MIB::adapterNetworkPortFCoENetworkAddress (where applicable).
+        tags:
+        - tag: component
+          value: hba-fc
+        uuid: e015851319284f9aa7536b40c21a47df
+    - name: RAID Controller Discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#RAIDNAME},1.3.6.1.4.1.19046.11.1.1.13.1.2.1.2]
+      key: raid.controller.discovery
+      description: LENOVO-XCC-MIB::raidControllerTable
+      uuid: 53d225a8430e4685af22f9373a43b787
+      lifetime: 30d
+      enabled_lifetime_type: DISABLE_NEVER
+      item_prototypes:
+      - name: 'RAID {#RAIDNAME}: Controller name'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.2.1.2.{#SNMPINDEX}
+        key: raid.name[{#SNMPINDEX}]
+        history: 14d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: storage
+        uuid: dcbce56f3b6f43fdbb1dff54a4c0a79c
+      - name: 'RAID {#RAIDNAME}: Battery installed'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.2.1.5.{#SNMPINDEX}
+        key: raid.battery.installed[{#SNMPINDEX}]
+        history: 30d
+        trends: 90d
+        valuemap:
+          name: raid ctrl batbck
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: battery
+        uuid: ab221798d92c4b7babc29d518357f50c
+      - name: 'RAID {#RAIDNAME}: Battery status'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.2.1.24.{#SNMPINDEX}
+        key: raid.battery.status[{#SNMPINDEX}]
+        history: 30d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        description: LENOVO-XCC-MIB::raidCtrlBatBCKStatus. State of the cache battery/supercapacitor.
+        tags:
+        - tag: component
+          value: battery
+        uuid: 0c487fbeb9194255821c3bedcaff5ffd
+        trigger_prototypes:
+        - expression: length(last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/raid.battery.status[{#SNMPINDEX}]))>0 and find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/raid.battery.status[{#SNMPINDEX}],,"iregexp","(optimal|normal|good|ok)")=0
+          name: 'RAID {#RAIDNAME}: battery status is not optimal'
+          priority: AVERAGE
+          description: 'Last value: {ITEM.LASTVALUE1}. If the controller has no battery by design, disable this trigger.'
+          manual_close: 'YES'
+          status: DISABLED
+          uuid: ec6ea43042354d869c9e7d5f05977cba
+      - name: 'RAID {#RAIDNAME}: Battery voltage'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.2.1.31.{#SNMPINDEX}
+        key: raid.battery.voltage[{#SNMPINDEX}]
+        delay: 10m
+        history: 14d
+        trends: 180d
+        value_type: FLOAT
+        units: mV
+        preprocessing:
+        - type: REGEX
+          parameters:
+          - (\d+)
+          - \1
+          error_handler: DISCARD_VALUE
+        description: LENOVO-XCC-MIB::raidCtrlBatBCKVoltage.
+        tags:
+        - tag: component
+          value: battery
+        uuid: 0f28690fb1f84cc18e06caa7c00f9087
+      - name: 'RAID {#RAIDNAME}: Battery temperature'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.2.1.34.{#SNMPINDEX}
+        key: raid.battery.temp[{#SNMPINDEX}]
+        delay: 10m
+        history: 14d
+        trends: 180d
+        value_type: FLOAT
+        units: °C
+        preprocessing:
+        - type: REGEX
+          parameters:
+          - (\d+)
+          - \1
+          error_handler: DISCARD_VALUE
+        description: LENOVO-XCC-MIB::raidCtrlBatBCKCrtTemp.
+        tags:
+        - tag: component
+          value: battery
+        uuid: 5caf5e8819124271a4ca5ac879ce815d
+      - name: 'RAID {#RAIDNAME}: Firmware version'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.2.1.4.{#SNMPINDEX}
+        key: raid.firmware[{#SNMPINDEX}]
+        history: 14d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: storage
+        uuid: bc740da805474058b8ce31264ce1088b
+    - name: Temperature Sensor Discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#TEMPDESCR},1.3.6.1.4.1.19046.11.1.1.1.2.1.2]
+      key: temperature.discovery
+      delay: 1h
+      description: LENOVO-XCC-MIB::tempDescr
+      filter:
+        conditions:
+        - macro: '{#TEMPDESCR}'
+          value: '{$NAME.NOT_MATCHES}'
+          operator: NOT_MATCHES_REGEX
+          formulaid: A
+      uuid: 83adf828ae1649f49dcd5a4b70a6be18
+      lifetime: 30d
+      enabled_lifetime_type: DISABLE_NEVER
+      item_prototypes:
+      - name: '{#TEMPDESCR}: Temperature'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.1.2.1.3.{#SNMPINDEX}
+        key: sensor.temp.value[{#TEMPDESCR}]
+        history: 7d
+        value_type: FLOAT
+        trends: 90d
+        units: °C
+        preprocessing:
+        - type: REGEX
+          parameters:
+          - ([0-9.]+)
+          - \1
+          error_handler: DISCARD_VALUE
+        tags:
+        - tag: component
+          value: temperature
+        uuid: 3864c8b0e98b48deacc4bbefcb2aafbb
+        trigger_prototypes:
+        - expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/sensor.temp.value[{#TEMPDESCR}],5m)>{$TEMP_CRIT:""}
+          recovery_mode: RECOVERY_EXPRESSION
+          recovery_expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/sensor.temp.value[{#TEMPDESCR}],5m)<{$TEMP_CRIT:""}-3
+          name: '{#TEMPDESCR}: temperature above critical threshold: >{$TEMP_CRIT:""}'
+          priority: HIGH
+          manual_close: 'YES'
+          uuid: 49536453d4e94938843e17851d89009b
+        - expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/sensor.temp.value[{#TEMPDESCR}],5m)>{$TEMP_WARN:""}
+          recovery_mode: RECOVERY_EXPRESSION
+          recovery_expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/sensor.temp.value[{#TEMPDESCR}],5m)<{$TEMP_WARN:""}-3
+          name: '{#TEMPDESCR}: temperature above warning threshold: >{$TEMP_WARN:""}'
+          priority: WARNING
+          manual_close: 'YES'
+          uuid: 686fc51c7f2e42a9aa6fd152840a7bfb
+    - name: Voltage Sensor Discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#VOLTDESCR},1.3.6.1.4.1.19046.11.1.1.2.2.1.2]
+      key: voltage.discovery
+      delay: 1h
+      description: LENOVO-XCC-MIB::voltDescr. The system (CMOS) battery usually appears here as a voltage sensor.
+      uuid: ac0a5e6098224a02bfad640117b3aa28
+      lifetime: 30d
+      enabled_lifetime_type: DISABLE_NEVER
+      item_prototypes:
+      - name: '{#VOLTDESCR}: Voltage'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.2.2.1.3.{#SNMPINDEX}
+        key: sensor.voltage.value[{#VOLTDESCR}]
+        delay: 3m
+        history: 14d
+        value_type: FLOAT
+        trends: 180d
+        units: V
+        preprocessing:
+        - type: REGEX
+          parameters:
+          - ([0-9.]+)
+          - \1
+          error_handler: DISCARD_VALUE
+        tags:
+        - tag: component
+          value: voltage
+        uuid: a1f370b34b3a47f9abaa833eb7d98c14
+      - name: '{#VOLTDESCR}: Status'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.2.2.1.11.{#SNMPINDEX}
+        key: sensor.voltage.status[{#VOLTDESCR}]
+        delay: 3m
+        history: 30d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: voltage
+        uuid: b1f435e7e43f4c1aa80a170ac0885545
+        trigger_prototypes:
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/sensor.voltage.status[{#VOLTDESCR}],,,"Normal")=0
+          name: '{#VOLTDESCR}: voltage/battery sensor is not in Normal state'
+          priority: WARNING
+          description: If the sensor is the system (CMOS) battery, this indicates a weak/missing battery.
+          manual_close: 'YES'
+          uuid: 57102eea17df4487ba459fd92c3e3238
+          dependencies:
+          - name: Server is powered off
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+    - name: GPU Discovery (inventory)
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#GPUINDEX},1.3.6.1.4.1.19046.11.1.1.14.5.1.1,{#GPUNAME},1.3.6.1.4.1.19046.11.1.1.14.5.1.2]
+      key: gpu.discovery
+      delay: 1h
+      description: 'LENOVO-XCC-MIB::adapterGPUFunctionTable. INVENTORY only: the XCC MIB exposes neither GPU health nor temperature via SNMP (that requires Redfish/REST).'
+      filter:
+        conditions:
+        - macro: '{#GPUNAME}'
+          value: '{$GPU.NAME_MATCHES}'
+          operator: MATCHES_REGEX
+          formulaid: A
+      uuid: 6ce445ea5f954925a4969c6bcdf4d82f
+      lifetime: 30d
+      enabled_lifetime_type: DISABLE_NEVER
+      item_prototypes:
+      - name: 'GPU {#GPUNAME}: Product name'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.14.5.1.2.{#GPUINDEX}
+        key: gpu.name[{#GPUINDEX}]
+        delay: 1h
+        history: 14d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: gpu
+        uuid: cfe53a947293409c80b6218b728cab52
+      - name: 'GPU {#GPUNAME}: Video memory size'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.14.5.1.12.{#GPUINDEX}
+        key: gpu.memory[{#GPUINDEX}]
+        delay: 1h
+        history: 14d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: gpu
+        uuid: 049eb7a2875243cf9d31f0bd37b282f8
+    - name: Firmware Inventory Discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#FWINDEX},1.3.6.1.4.1.19046.11.1.1.5.1.1.1,{#FWTYPE},1.3.6.1.4.1.19046.11.1.1.5.1.1.2]
+      key: firmware.discovery
+      delay: 1h
+      uuid: eb5591cda90248b9b6426f94b20f8d81
+      lifetime: 30d
+      enabled_lifetime_type: DISABLE_NEVER
+      item_prototypes:
+      - name: 'Firmware {#FWTYPE}: Version'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.1.1.3.{#FWINDEX}
+        key: firmware.version[{#FWINDEX}]
+        history: 90d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: firmware
+        uuid: 4e4478f69aaf451ba0b4569371a17f47
+      - name: 'Firmware {#FWTYPE}: Release date'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.1.1.4.{#FWINDEX}
+        key: firmware.releasedate[{#FWINDEX}]
+        history: 90d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: firmware
+        uuid: 41c7b3e136d14d168baf624d8e5005e6
+    - name: LED Status Discovery
+      type: SNMP_AGENT
+      snmp_oid: discovery[{#LEDINDEX},1.3.6.1.4.1.19046.11.1.1.8.2.1.1,{#LEDLABEL},1.3.6.1.4.1.19046.11.1.1.8.2.1.4]
+      key: led.discovery
+      uuid: 2ef01786107d4eedac9a589a693c969b
+      lifetime: 30d
+      enabled_lifetime_type: DISABLE_NEVER
+      item_prototypes:
+      - name: 'LED {#LEDLABEL}: State'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.8.2.1.5.{#LEDINDEX}
+        key: led.state[{#LEDINDEX}]
+        history: 7d
+        trends: 90d
+        valuemap:
+          name: ledstate
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: led
+        uuid: 2e50ffbe75714bd4aaaf0bbc99352a54
+      - name: 'LED {#LEDLABEL}: Color'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.8.2.1.6.{#LEDINDEX}
+        key: led.color[{#LEDINDEX}]
+        history: 7d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        tags:
+        - tag: component
+          value: led
+        uuid: b724a1d761194f53b4e0511b2eabc53c
+    macros:
+    - macro: '{$DISK_OK_STATUS}'
+      value: Normal
+    - macro: '{$FAN_OK_STATUS}'
+      value: Normal
+    - macro: '{$PSU_OK_STATUS}'
+      value: Normal
+    - macro: '{$HEALTH_CRIT_STATUS}'
+      value: '2'
+    - macro: '{$HEALTH_DISASTER_STATUS}'
+      value: '0'
+    - macro: '{$HEALTH_WARN_STATUS}'
+      value: '4'
+    - macro: '{$NAME.NOT_MATCHES}'
+      value: DTS
+      description: Excludes internal temperature sensors (DTS) from discovery
+    - macro: '{$TEMP_CRIT}'
+      value: '60'
+    - macro: '{$TEMP_CRIT:"Ambient"}'
+      value: '35'
+    - macro: '{$TEMP_CRIT_LOW}'
+      value: '5'
+    - macro: '{$TEMP_WARN}'
+      value: '50'
+    - macro: '{$TEMP_WARN:"Ambient"}'
+      value: '32'
+    - macro: '{$POWER_MAX}'
+      value: '1400'
+      description: Power draw (W) above which an alert is raised. Adjust to the installed power supply/supplies.
+    - macro: '{$HBA_FC.NAME_MATCHES}'
+      value: .*([Ff]ibre.?[Cc]hannel| FC |FC$|LPe[0-9]|LPm[0-9]|QLE[0-9]|QLogic.*FC|Emulex.*FC).*
+      description: Regex that matches genuine Fibre Channel HBAs in the adapter port table. A port must match this AND must NOT match {$HBA_FC.NAME_NOT_MATCHES}. Adjust to the name reported by your HBA.
+    - macro: '{$HBA_FC.NAME_NOT_MATCHES}'
+      value: .*([Ee]thernet|OCP| ?GbE|RoCE|iSCSI|SFP28|10/25|10/40|NIC|RDMA|BASE-T).*
+      description: Regex that excludes Ethernet/NIC adapters from HBA FC discovery. Broadcom/Emulex/QLogic also make Ethernet NICs, so a name matching these terms is treated as a network card, not an HBA.
+    - macro: '{$GPU.NAME_MATCHES}'
+      value: .*(NVIDIA|Tesla|A2|A10|A16|A30|A40|A100|L4|L40|H100|GPU).*
+      description: Regex used to identify GPUs. Inventory only (the XCC MIB does not expose GPU health/temperature via SNMP).
+    - macro: '{$SNMP.TIMEOUT}'
+      value: 10m
+      description: No-data window that characterizes loss of SNMP polling.
+    - macro: '{$ICMP_LOSS_WARN}'
+      value: '20'
+    - macro: '{$ICMP_RESPONSE_TIME_WARN}'
+      value: '0.15'
+    - macro: '{$DRIVE_LIFE_WARN}'
+      value: '10'
+      description: SSD remaining-life percentage below which an alert is raised.
+    - macro: '{$TRAP.SEVERITY_MATCHES}'
+      value: (?i)(critical|error|fail|fault|non-recover)
+      description: Severity regex for XCC traps that should raise a HIGH alert.
+    valuemaps:
+    - uuid: cbbef7b7bea243ed83131a513f67cc0f
+      name: systemHealthStat
+      mappings:
+      - value: '0'
+        newvalue: nonRecoverable
+      - value: '2'
+        newvalue: critical
+      - value: '4'
+        newvalue: nonCritical
+      - value: '255'
+        newvalue: normal
+    - uuid: 4354c89b30fe4e809384569f833167c3
+      name: currentSysPowerStatus
+      mappings:
+      - value: '0'
+        newvalue: poweredOff
+      - value: '1'
+        newvalue: sleepS3
+      - value: '255'
+        newvalue: poweredOn
+    - uuid: 98f3d981e312442ebd8497618592d008
+      name: ledstate
+      mappings:
+      - value: '0'
+        newvalue: 'off'
+      - value: '1'
+        newvalue: 'on'
+      - value: '2'
+        newvalue: blinking
+    - uuid: 991a937e1ef848289ef855a4382bcaa9
+      name: raid ctrl batbck
+      mappings:
+      - value: '0'
+        newvalue: uninstalled
+      - value: '1'
+        newvalue: installed
+      - value: '2'
+        newvalue: unknown
+    - uuid: 79de7aa446034348afe57877df19d0b5
+      name: raidoobcapable
+      mappings:
+      - value: '0'
+        newvalue: disabled
+      - value: '1'
+        newvalue: enabled
+    - uuid: 98f7953b066f4eaa9f25043c7d7b019f
+      name: systemState
+      mappings:
+      - value: '0'
+        newvalue: systemPowerOffOrStateUnknown
+      - value: '1'
+        newvalue: systemPowerOnOrStartingUEFI
+      - value: '2'
+        newvalue: systemInUEFI
+      - value: '3'
+        newvalue: uEFIErrorDetected
+      - value: '4'
+        newvalue: bootingOSorInUnsupportedOS
+      - value: '5'
+        newvalue: oSBooted
+      - value: '6'
+        newvalue: suspendToRAM
+      - value: '7'
+        newvalue: systemInSetup
+      - value: '8'
+        newvalue: systemInLXPMMaintenanceMode
+      - value: '9'
+        newvalue: systemInMemoryTest
+    - uuid: 7d0fb7424e1a4e53a66f9c6c68f0b714
+      name: snmp availability
+      mappings:
+      - value: '0'
+        newvalue: not available
+      - value: '1'
+        newvalue: available
+      - value: '2'
+        newvalue: unknown
+  triggers:
+  - expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/icmpping,3m)=0
+    name: 'XCC: not responding to ICMP (unreachable)'
+    priority: HIGH
+    description: The XCC management IP has not answered ping for 3 minutes.
+    uuid: 0a2df973d5f243c69b690e5e47a1f923
+  - expression: min(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/icmppingloss,5m)>{$ICMP_LOSS_WARN}
+    name: 'XCC: perda de pacotes ICMP alta (>{$ICMP_LOSS_WARN}%)'
+    priority: WARNING
+    dependencies:
+    - name: 'XCC: not responding to ICMP (unreachable)'
+      expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/icmpping,3m)=0
+    uuid: 88c2c07f446845dbbfddaec59c53950d
+  - expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/zabbix[host,snmp,available],5m)=0
+    name: 'SNMP: XCC agent is not responding'
+    priority: AVERAGE
+    description: Zabbix flagged the SNMP interface as unavailable. Check credentials, the SNMP ACL on the XCC, and connectivity.
+    dependencies:
+    - name: 'XCC: not responding to ICMP (unreachable)'
+      expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/icmpping,3m)=0
+    uuid: ba8a562664fa480aab4ee9eeed974563
+  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.health.status)={$HEALTH_CRIT_STATUS} or last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.health.status)={$HEALTH_DISASTER_STATUS}
+    name: Overall system health is CRITICAL
+    priority: HIGH
+    manual_close: 'YES'
+    dependencies:
+    - name: Server is powered off
+      expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+    uuid: feefc19e7854458da0d6712a0afed987
+  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.health.status)={$HEALTH_WARN_STATUS}
+    name: Overall system health is degraded (non-critical)
+    priority: WARNING
+    manual_close: 'YES'
+    dependencies:
+    - name: Server is powered off
+      expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+    uuid: d7802a35e53c4cccbb736415cc0386a1
+  - expression: nodata(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.health.status,{$SNMP.TIMEOUT})=1
+    name: 'SNMP: no data from XCC for {$SNMP.TIMEOUT}'
+    priority: AVERAGE
+    description: No SNMP data received within the defined window. Distinguishes "component OK" from "polling stopped".
+    dependencies:
+    - name: 'SNMP: XCC agent is not responding'
+      expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/zabbix[host,snmp,available],5m)=0
+    - name: 'XCC: not responding to ICMP (unreachable)'
+      expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/icmpping,3m)=0
+    uuid: 9d604348565d4fae952c995752172770
+  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+    name: Server is powered off
+    priority: INFO
+    description: currentSysPowerStatus indicates the server is not powered on (255=poweredOn). The XCC keeps answering SNMP. While active, this trigger suppresses component alerts (fan, overall health, etc.) to avoid false positives.
+    manual_close: 'YES'
+    uuid: fb30c12ffec04cf79eaf58aa64f5f0e4
+  - expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/power.consumption,5m)>{$POWER_MAX}
+    name: 'Power draw above threshold: >{$POWER_MAX}W'
+    priority: WARNING
+    description: 'Last value: {ITEM.LASTVALUE1}. Check workload and power-supply redundancy.'
+    manual_close: 'YES'
+    uuid: 0432e1c3de014943a22d5e4f9da77dc8
+  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/psu.failed.count)>=1 and last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/psu.installed.count)>=2
+    name: 'PSU: redundancy lost (one or more supplies degraded)'
+    priority: HIGH
+    description: With 2+ supplies installed, at least one is not in Normal state - the system has lost N+N redundancy.
+    manual_close: 'YES'
+    uuid: ebd11952769f4fe295a613ccc3b2048e
+  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/raid.oob_capable)=0
+    name: RAID Out-of-band monitoring is disabled on the XCC
+    priority: INFO
+    description: Enable it under BMC Configuration > Storage in the XCC to collect disks and controllers.
+    manual_close: 'YES'
+    uuid: 0fbd69b646eb4003a2c9ddf0f07ae3e0
+  - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/snmptrap["Lenovo XCC"],,"iregexp","{$TRAP.SEVERITY_MATCHES}")=1
+    name: High-severity trap received from XCC
+    priority: HIGH
+    description: 'Last trap: {ITEM.LASTVALUE1}. Trap whose text matched {$TRAP.SEVERITY_MATCHES}.'
+    manual_close: 'YES'
+    uuid: bda4fc8ec995465c823e3d20202f0d29
+  - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/snmptrap["Lenovo XCC"],,"iregexp","(?i)(warning|non-critical|degrad)")=1
+    name: Warning trap received from XCC
+    priority: WARNING
+    description: 'Last trap: {ITEM.LASTVALUE1}.'
+    manual_close: 'YES'
+    uuid: 69dde0f3917b4440bc21b54c111a8c41
