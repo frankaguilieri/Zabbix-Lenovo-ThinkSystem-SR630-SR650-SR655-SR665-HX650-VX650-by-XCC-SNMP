@@ -1,18 +1,18 @@
 zabbix_export:
   version: '7.0'
   template_groups:
-  - uuid: 0b8f45f148874812b5ffdeaf5202fd90
+  - uuid: b2e1cf82dfb140c481c694efb3427c63
     name: Templates/Servers Hardware
   templates:
-  - uuid: 04a4f433db88474386d56416e18a7948
+  - uuid: 36266843df6941f7b39661466d9b465a
     template: Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP
     name: Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP
     description: |-
-      SNMP template for Lenovo ThinkSystem SR630, SR650, SR655, SR665, HX650 and VX650 (all generations) via the XClarity Controller (XCC) SNMP agent, LENOVO-XCC-MIB (1.3.6.1.4.1.19046.11.1).
       Autor: Frank Aguilieri
-      Versão: 2.1
       Data: 15/07/2026
       GitHub: https://github.com/frankaguilieri/Zabbix-Lenovo-ThinkSystem-SR630-SR650-SR655-SR665-HX650-VX650-by-XCC-SNMP
+
+      SNMP template for Lenovo ThinkSystem SR630, SR650, SR655 and SR665 (all generations) via the XClarity Controller (XCC) SNMP agent, LENOVO-XCC-MIB (1.3.6.1.4.1.19046.11.1).
 
       Coverage: memory, power supplies (PSU) + redundancy, disks (basic health plus per-drive stats: predictive failure, media errors, SSD remaining life, temperature), battery (RAID controller status/voltage/temperature and system battery via the voltage table), processor, fans (status + numeric speed), network interfaces, Fibre Channel HBA, power consumption (total + CPU/memory/other + available/remaining), temperature, voltage, GPU (inventory), firmware, LEDs, SNMP trap and availability (ICMP + SNMP).
 
@@ -74,6 +74,7 @@ zabbix_export:
       - GPU: the MIB exposes inventory only (name/memory). GPU health/temperature are not available over SNMP; they require Redfish/REST.
       - Network interface here = adapter/link status (not traffic/errors). For bps/errors use the IF-MIB on the OS or the switch.
       - Component alerts (fan, overall health, memory, CPU, disk, voltage) are suppressed while the server is powered off (dependency on the 'Server is powered off' trigger).
+      - Host inventory: this template links hardware items (type, model, serial, name, vendor, CPU model) to host inventory fields. To populate them, set the host Inventory mode to Automatic (Data collection > Hosts > <host> > Inventory tab), or set Administration > General > Other configuration parameters > Default host inventory mode = Automatic.
       - PSU redundancy: the calculated item psu.failed.count sums the supply health codes; the redundancy trigger fires with 2+ supplies installed and at least one degraded.
     vendor:
       name: Custom
@@ -92,7 +93,7 @@ zabbix_export:
       tags:
       - tag: component
         value: availability
-      uuid: 5693037d0504438ca29c4bb151e313a6
+      uuid: 6f456587298d4afe9bfcb9df78326931
     - name: 'XCC: ICMP loss'
       type: SIMPLE
       key: icmppingloss
@@ -104,7 +105,7 @@ zabbix_export:
       tags:
       - tag: component
         value: availability
-      uuid: 425e290440dc47a38012080d063cb2e6
+      uuid: d88d698e4c8044fdbbb20b695569777b
     - name: 'XCC: ICMP response time'
       type: SIMPLE
       key: icmppingsec
@@ -116,7 +117,7 @@ zabbix_export:
       tags:
       - tag: component
         value: availability
-      uuid: 9045b5b414c249d1bbc81e7c3f83ecd5
+      uuid: 3eef1c2ed8094b8c8263423e3b1bbf11
     - name: SNMP availability
       type: INTERNAL
       key: zabbix[host,snmp,available]
@@ -130,7 +131,7 @@ zabbix_export:
       tags:
       - tag: component
         value: availability
-      uuid: fd15366dbf344d58a5aa3f3ebcb88313
+      uuid: 803de97609594e48b3a0882c2a834f9a
     - name: Overall System Health Status
       type: SNMP_AGENT
       snmp_oid: .1.3.6.1.4.1.19046.11.1.1.4.1.0
@@ -148,7 +149,7 @@ zabbix_export:
       tags:
       - tag: component
         value: health
-      uuid: e09f6e0e74d84dd2b3d583b3128ba3f6
+      uuid: cd0fb5d345ed411f946ccc8cfd4ee6af
     - name: System power state
       type: SNMP_AGENT
       snmp_oid: .1.3.6.1.4.1.19046.11.1.5.1.1.0
@@ -165,7 +166,7 @@ zabbix_export:
       tags:
       - tag: component
         value: power
-      uuid: 9b2220b4bd9c4af597141496ae5bd951
+      uuid: 90ab31dd02b242d29f9242faaa88312d
     - name: System state (POST/boot)
       type: SNMP_AGENT
       snmp_oid: .1.3.6.1.4.1.19046.11.1.5.1.4.0
@@ -182,7 +183,7 @@ zabbix_export:
       tags:
       - tag: component
         value: health
-      uuid: 6ebf5542ae9e402192c539419dda1282
+      uuid: d197a6fdc91347d6bb5039072a33cd0c
     - name: Machine Type
       type: SNMP_AGENT
       snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.2.1.1.0
@@ -195,10 +196,11 @@ zabbix_export:
       - type: DISCARD_UNCHANGED_HEARTBEAT
         parameters:
         - 1h
+      inventory_link: TYPE
       tags:
       - tag: component
         value: inventory
-      uuid: 1e293a8491ef413f98f8ea1b569a49de
+      uuid: b71de410190a48e88337aa290afee306
     - name: Machine Model
       type: SNMP_AGENT
       snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.2.1.2.0
@@ -211,10 +213,11 @@ zabbix_export:
       - type: DISCARD_UNCHANGED_HEARTBEAT
         parameters:
         - 1h
+      inventory_link: MODEL
       tags:
       - tag: component
         value: inventory
-      uuid: 510f2c73d14b42a7b8b69c090b91d537
+      uuid: f597fb4fca544d0c9e355c88f2222f36
     - name: Machine Serial Number
       type: SNMP_AGENT
       snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.2.1.3.0
@@ -227,10 +230,11 @@ zabbix_export:
       - type: DISCARD_UNCHANGED_HEARTBEAT
         parameters:
         - 1h
+      inventory_link: SERIALNO_A
       tags:
       - tag: component
         value: inventory
-      uuid: 65feda579a1f4dc2ab840338dbe32494
+      uuid: ec7c3961a1164b68973dcb957d9da169
     - name: Machine Name
       type: SNMP_AGENT
       snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.2.1.5.0
@@ -243,10 +247,29 @@ zabbix_export:
       - type: DISCARD_UNCHANGED_HEARTBEAT
         parameters:
         - 1h
+      inventory_link: NAME
       tags:
       - tag: component
         value: inventory
-      uuid: 743fd0d938844754ab29c0313561d2fa
+      uuid: 6cdda90fbc8a45baac547753a3ba629b
+    - name: Vendor
+      type: CALCULATED
+      key: inventory.vendor
+      params: '1'
+      delay: 12h
+      history: 7d
+      trends: '0'
+      value_type: TEXT
+      preprocessing:
+      - type: JAVASCRIPT
+        parameters:
+        - return 'Lenovo';
+      inventory_link: VENDOR
+      description: Valor fixo "Lenovo" para preencher o campo vendor do inventario.
+      tags:
+      - tag: component
+        value: inventory
+      uuid: 757a501951584accac14d3c5247c62c5
     - name: Fans installed (total)
       type: SNMP_AGENT
       snmp_oid: 1.3.6.1.4.1.19046.11.1.1.3.1.0
@@ -257,7 +280,25 @@ zabbix_export:
       tags:
       - tag: component
         value: fan
-      uuid: 75d4531c17964ef9bf07f092b57a2343
+      uuid: acdec4e1d70345d49a03c8d4af9ae54c
+    - name: CPU model (CPU 1, for inventory)
+      type: SNMP_AGENT
+      snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.20.1.12.1
+      key: cpu.model.inventory
+      delay: 1h
+      history: 14d
+      trends: '0'
+      value_type: TEXT
+      preprocessing:
+      - type: DISCARD_UNCHANGED_HEARTBEAT
+        parameters:
+        - 1h
+      inventory_link: HARDWARE
+      description: LENOVO-XCC-MIB::processorProductName da CPU 1 (indice .1). Popula o campo hardware do inventario. O modelo por-CPU (todas as CPUs) esta na regra Processor Discovery.
+      tags:
+      - tag: component
+        value: cpu
+      uuid: b20a971e2b29447a8a98e3378a7ab0fc
     - name: Total power in use
       type: SNMP_AGENT
       snmp_oid: .1.3.6.1.4.1.19046.11.1.1.10.1.10.0
@@ -271,7 +312,7 @@ zabbix_export:
       tags:
       - tag: component
         value: power
-      uuid: 472f0418fb5240d692ea7e965587414a
+      uuid: 2cdc88ac60b54418be2ddd67ea30c580
     - name: Power consumption - CPU
       type: SNMP_AGENT
       snmp_oid: .1.3.6.1.4.1.19046.11.1.1.10.1.11.0
@@ -285,7 +326,7 @@ zabbix_export:
       tags:
       - tag: component
         value: power
-      uuid: 1d4906f874a6400abda3474fbf949f8b
+      uuid: 033312da26354f69b797bd29ecc6c2a2
     - name: Power consumption - Memory
       type: SNMP_AGENT
       snmp_oid: .1.3.6.1.4.1.19046.11.1.1.10.1.12.0
@@ -299,7 +340,7 @@ zabbix_export:
       tags:
       - tag: component
         value: power
-      uuid: de1d865f28794992b1a75f942cb83402
+      uuid: 210dc0b258c54238b63303e1e2b1e7c4
     - name: Power consumption - Other
       type: SNMP_AGENT
       snmp_oid: .1.3.6.1.4.1.19046.11.1.1.10.1.13.0
@@ -313,7 +354,7 @@ zabbix_export:
       tags:
       - tag: component
         value: power
-      uuid: fdfa0791c89c4dc9a7c4cfb9888635e5
+      uuid: eee00dca05a74de5810766ec6a08d70a
     - name: Total power available (PSUs)
       type: SNMP_AGENT
       snmp_oid: .1.3.6.1.4.1.19046.11.1.1.10.1.9.0
@@ -327,11 +368,11 @@ zabbix_export:
       tags:
       - tag: component
         value: power
-      uuid: 13460b9e041047dcab4c3b2f5e043954
+      uuid: 5cc3b82e95f44b8cada660f6d2ce0f21
     - name: Remaining power headroom
       type: CALCULATED
       key: power.remaining
-      params: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/power.available)-last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/power.consumption)
+      params: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/power.available)-last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/power.consumption)
       delay: 10m
       history: 14d
       trends: 180d
@@ -346,7 +387,7 @@ zabbix_export:
       tags:
       - tag: component
         value: power
-      uuid: 4cf8e64ba8d2463ba81fde8c01686ab8
+      uuid: f9640dd133324cccbe2d2f9c400ebffa
     - name: 'PSU: total installed'
       type: SNMP_AGENT
       snmp_oid: .1.3.6.1.4.1.19046.11.1.1.11.1.0
@@ -359,7 +400,7 @@ zabbix_export:
       tags:
       - tag: component
         value: psu
-      uuid: 502580fc7fcb4cc0b73d5bdfb626cfed
+      uuid: 88a347be8e64463c977c4aae1b52b815
     - name: 'PSU: failed supplies (count)'
       type: CALCULATED
       key: psu.failed.count
@@ -367,7 +408,7 @@ zabbix_export:
       history: 7d
       trends: 90d
       value_type: UNSIGNED
-      params: sum(last_foreach(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/psu.health.code[*]))
+      params: sum(last_foreach(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/psu.health.code[*]))
       description: Sum of power-supply health codes (0=Normal, 1=not Normal). Basis for redundancy-loss detection. If no supply has been discovered yet (empty foreach), returns 0 via error handling.
       preprocessing:
       - type: CHECK_NOT_SUPPORTED
@@ -378,7 +419,7 @@ zabbix_export:
       tags:
       - tag: component
         value: psu
-      uuid: 496d784b53fa4f5aa17b5522c36d9ded
+      uuid: fee0ba54e6644952bd174f062c72ae82
     - name: Power On Hours
       type: SNMP_AGENT
       snmp_oid: .1.3.6.1.4.1.19046.11.1.5.1.2.0
@@ -390,7 +431,7 @@ zabbix_export:
       tags:
       - tag: component
         value: health
-      uuid: 8c9495cc5d1c485ebaf028e01de79a5b
+      uuid: 128daa7f5644455989397bab73825684
     - name: XCC Restart Count
       type: SNMP_AGENT
       snmp_oid: .1.3.6.1.4.1.19046.11.1.5.1.3.0
@@ -401,7 +442,7 @@ zabbix_export:
       tags:
       - tag: component
         value: health
-      uuid: 002a230911874f5ebdc4f4cdfe08e8c7
+      uuid: 01881e8d04d541cf92b6b6705dcc5b07
     - name: RAID Out-of-band capable
       type: SNMP_AGENT
       snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.1.0
@@ -419,7 +460,7 @@ zabbix_export:
       tags:
       - tag: component
         value: storage
-      uuid: 8b20877caf594fad97cedf360586bdeb
+      uuid: ea7bf45df02e4e1286aec329080d3e1b
     - name: SNMP Trap (XCC)
       type: SNMP_TRAP
       key: snmptrap["Lenovo XCC"]
@@ -432,14 +473,14 @@ zabbix_export:
       tags:
       - tag: component
         value: health
-      uuid: 01ba88aa65f543989357d95cc0db0782
+      uuid: b9b6ded01f33425c916f187204202dca
     discovery_rules:
     - name: Fan Discovery
       type: SNMP_AGENT
       snmp_oid: discovery[{#FANINDEX},1.3.6.1.4.1.19046.11.1.1.3.2.1.1]
       key: fan.discovery
       description: LENOVO-XCC-MIB::fanIndex
-      uuid: acb3ed0fa331401e9c556138d5c9b2ea
+      uuid: 7fbac31c69234c6abb87da9fb071d7a5
       lifetime: 30d
       enabled_lifetime_type: DISABLE_NEVER
       item_prototypes:
@@ -457,7 +498,7 @@ zabbix_export:
         tags:
         - tag: component
           value: fan
-        uuid: 0bca45e556a840fb8452504a21f0b493
+        uuid: ec00d3d17dd8441892ccc53533a828c8
       - name: 'Fan {#FANINDEX}: Speed raw'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.3.2.1.3.{#FANINDEX}
@@ -469,7 +510,7 @@ zabbix_export:
         tags:
         - tag: component
           value: fan
-        uuid: d81bd108a450489ca116f960de75a5c0
+        uuid: 8ab459f606014a4d96e541f94c0f2e79
       - name: 'Fan {#FANINDEX}: Speed'
         type: DEPENDENT
         key: fan.speed[{#FANINDEX}]
@@ -489,7 +530,7 @@ zabbix_export:
         tags:
         - tag: component
           value: fan
-        uuid: 724cad261baf4c1fa9d2dc78a5de8e94
+        uuid: d95af00ea1174a8fa8f24407f9b5281d
       - name: 'Fan {#FANINDEX}: Health status'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.3.2.1.10.{#FANINDEX}
@@ -504,22 +545,22 @@ zabbix_export:
         tags:
         - tag: component
           value: fan
-        uuid: 5de3b6cb76b844d297c5f27ac67dfcbe
+        uuid: 617a9bc234174a29ab855b11a347e064
         trigger_prototypes:
-        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/fan.status[{#FANINDEX}],,,"{$FAN_OK_STATUS}")=0
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/fan.status[{#FANINDEX}],,,"{$FAN_OK_STATUS}")=0
           name: 'Fan {#FANINDEX}: not in OK state'
           priority: WARNING
           manual_close: 'YES'
-          uuid: 023ab4984f584808a6e3f5cc132e1fa4
+          uuid: 07adbca2c90d4e71a845ae75ecfd9174
           dependencies:
           - name: Server is powered off
-            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.power.state)<>255
     - name: Memory Module Discovery
       type: SNMP_AGENT
       snmp_oid: discovery[{#MEMINDEX},1.3.6.1.4.1.19046.11.1.1.5.21.1.1,{#MEMDESCR},1.3.6.1.4.1.19046.11.1.1.5.21.1.2,{#MEMTYPE},1.3.6.1.4.1.19046.11.1.1.5.21.1.6]
       key: memory.discovery
       description: LENOVO-XCC-MIB::systemMemoryVpdTable
-      uuid: 672ec88901c5490f95a6749d4bf7643d
+      uuid: 8e20b9007ab94abb81613532a36d11ae
       lifetime: 30d
       enabled_lifetime_type: DISABLE_NEVER
       item_prototypes:
@@ -537,16 +578,16 @@ zabbix_export:
         tags:
         - tag: component
           value: memory
-        uuid: 3013179abbb24efb909cff89a176d16d
+        uuid: 62c67a7e990b4a949e5eaac719e0c478
         trigger_prototypes:
-        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/memory.status[{#MEMINDEX}],,,"Normal")=0
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/memory.status[{#MEMINDEX}],,,"Normal")=0
           name: '{#MEMDESCR} ({#MEMTYPE}): memory module is not in Normal state'
           priority: AVERAGE
           manual_close: 'YES'
-          uuid: 43457f2c393344b49abdd3657b3690b3
+          uuid: 26897449a9cc46edadb18d2c99a720bb
           dependencies:
           - name: Server is powered off
-            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.power.state)<>255
       - name: '{#MEMDESCR} ({#MEMTYPE}): Size'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.21.1.7.{#MEMINDEX}
@@ -557,7 +598,7 @@ zabbix_export:
         tags:
         - tag: component
           value: memory
-        uuid: f50130a7362a4ba9975eb4c65adb75a8
+        uuid: 153eeb78950340259f4778d91336e5b9
       - name: '{#MEMDESCR} ({#MEMTYPE}): Speed'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.21.1.9.{#MEMINDEX}
@@ -568,7 +609,7 @@ zabbix_export:
         tags:
         - tag: component
           value: memory
-        uuid: 9f8aa25b77ce46f8be063096cdd62f32
+        uuid: 8ba8084edb064c0ab73466b172988110
       - name: '{#MEMDESCR} ({#MEMTYPE}): Serial Number'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.21.1.4.{#MEMINDEX}
@@ -583,7 +624,7 @@ zabbix_export:
         tags:
         - tag: component
           value: memory
-        uuid: a19cf46f1d384d89bbbe8709ec850f8e
+        uuid: b7a85548aae24fc4b96ac8e2f50106e7
       - name: '{#MEMDESCR} ({#MEMTYPE}): Part Number'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.21.1.11.{#MEMINDEX}
@@ -598,13 +639,13 @@ zabbix_export:
         tags:
         - tag: component
           value: memory
-        uuid: 099cac63be6740a58ae858e504570d1c
+        uuid: 19294ba323ec4658b72e51082bb8ae32
     - name: Processor Discovery
       type: SNMP_AGENT
       snmp_oid: discovery[{#CPUINDEX},1.3.6.1.4.1.19046.11.1.1.5.20.1.1,{#CPUMODEL},1.3.6.1.4.1.19046.11.1.1.5.20.1.12]
       key: cpu.discovery
       description: LENOVO-XCC-MIB::systemCPUVpdTable
-      uuid: 60669cd8b7324fb4bc3bf8770141c499
+      uuid: efe7f658014e4980a450f6653e75003a
       lifetime: 30d
       enabled_lifetime_type: DISABLE_NEVER
       item_prototypes:
@@ -622,16 +663,16 @@ zabbix_export:
         tags:
         - tag: component
           value: cpu
-        uuid: 3688f4b30e0c4e80be9c11c5fdd9e4aa
+        uuid: 5ba5a22c2fe244398245fb38fcefd2f5
         trigger_prototypes:
-        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/cpu.status[{#CPUINDEX}],,,"Normal")=0
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/cpu.status[{#CPUINDEX}],,,"Normal")=0
           name: 'CPU {#CPUINDEX} ({#CPUMODEL}): processor is not in Normal state'
           priority: HIGH
           manual_close: 'YES'
-          uuid: dfbaab0be1bc47869f5af0d45d563913
+          uuid: e1ce8568793740e4a59db5c749c29e0c
           dependencies:
           - name: Server is powered off
-            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.power.state)<>255
       - name: 'CPU {#CPUINDEX} ({#CPUMODEL}): Core count'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.20.1.7.{#CPUINDEX}
@@ -641,13 +682,30 @@ zabbix_export:
         tags:
         - tag: component
           value: cpu
-        uuid: caea7dc5c7694866b57e5e0d63c33346
+        uuid: be326781413c4280b2f41770b99151eb
+      - name: 'CPU {#CPUINDEX}: Model'
+        type: SNMP_AGENT
+        snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.20.1.12.{#CPUINDEX}
+        key: cpu.model[{#CPUINDEX}]
+        delay: 1h
+        history: 14d
+        value_type: TEXT
+        trends: '0'
+        preprocessing:
+        - type: DISCARD_UNCHANGED_HEARTBEAT
+          parameters:
+          - 1h
+        description: LENOVO-XCC-MIB::processorProductName. Processor model.
+        tags:
+        - tag: component
+          value: cpu
+        uuid: af2db063b03b42b38172f8cabf42c56d
     - name: Physical Disk Discovery
       type: SNMP_AGENT
       snmp_oid: discovery[{#DISKNAME},.1.3.6.1.4.1.19046.11.1.1.12.2.1.2]
       key: physicaldisk.discovery
       description: LENOVO-XCC-MIB::diskTable (requires raidOOBCapable enabled)
-      uuid: 85f68f27a5364b9383449c6aa989cead
+      uuid: 013b8ab711964777bf72a17ab6a1c37c
       lifetime: 30d
       enabled_lifetime_type: DISABLE_NEVER
       item_prototypes:
@@ -667,16 +725,16 @@ zabbix_export:
         tags:
         - tag: component
           value: disk
-        uuid: c20901b667b44bc2a25d5b49aa11757b
+        uuid: 83c72095f63f482aac0d9408ad389b17
         trigger_prototypes:
-        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/disk.status[{#SNMPINDEX}],,,"{$DISK_OK_STATUS}")=0
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/disk.status[{#SNMPINDEX}],,,"{$DISK_OK_STATUS}")=0
           name: 'Disk {#DISKNAME}: physical disk is not in OK state'
           priority: HIGH
           manual_close: 'YES'
-          uuid: 4c13fdf3666e412a98b75042ac448e8a
+          uuid: 59767924afc441498cce210946cbfc10
           dependencies:
           - name: Server is powered off
-            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.power.state)<>255
       - name: 'Disk {#DISKNAME}: FRU name'
         type: SNMP_AGENT
         snmp_oid: .1.3.6.1.4.1.19046.11.1.1.12.2.1.2.{#SNMPINDEX}
@@ -692,13 +750,13 @@ zabbix_export:
         tags:
         - tag: component
           value: disk
-        uuid: 58bc4a3b8f794b5fa21ec05b425dde9e
+        uuid: cf5cf0a7120c4e919ed8de5434533dc7
     - name: RAID Drive Discovery
       type: SNMP_AGENT
       snmp_oid: discovery[{#DRVNAME},1.3.6.1.4.1.19046.11.1.1.13.1.3.1.2,{#DRVSLOT},1.3.6.1.4.1.19046.11.1.1.13.1.3.1.5]
       key: raiddrive.discovery
       description: LENOVO-XCC-MIB::raidDriveTable. Detailed per-drive statistics behind the RAID controller.
-      uuid: 98069208d2fb452c87ddda477b55473f
+      uuid: 71c52be17d6347ccaf9833d4f7f00ece
       lifetime: 30d
       enabled_lifetime_type: DISABLE_NEVER
       item_prototypes:
@@ -717,16 +775,16 @@ zabbix_export:
         tags:
         - tag: component
           value: disk
-        uuid: 5713810c9eac49369a27d53bd4cbc41a
+        uuid: 9493a8523dec4200aae4e4760560dbec
         trigger_prototypes:
-        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/raiddrive.health[{#SNMPINDEX}],,,"Normal")=0 and length(last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/raiddrive.health[{#SNMPINDEX}]))>0
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/raiddrive.health[{#SNMPINDEX}],,,"Normal")=0 and length(last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/raiddrive.health[{#SNMPINDEX}]))>0
           name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): RAID drive is not healthy'
           priority: HIGH
           manual_close: 'YES'
-          uuid: 200208c164584a35be2e5dec5193d490
+          uuid: 057014aca52946ab9dc4e67fd68d4edd
           dependencies:
           - name: Server is powered off
-            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.power.state)<>255
       - name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): State'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.3.1.4.{#SNMPINDEX}
@@ -742,7 +800,7 @@ zabbix_export:
         tags:
         - tag: component
           value: disk
-        uuid: 5ef57ab832d94ef9badcca3ce845bda2
+        uuid: 93ad0206bd834d3c8bad2c02bc14b1f2
       - name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): Predictive failure count'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.3.1.24.{#SNMPINDEX}
@@ -754,17 +812,17 @@ zabbix_export:
         tags:
         - tag: component
           value: disk
-        uuid: 9475716bde524804a64eac2028cf3b1b
+        uuid: 6b21c4939cb44801815758d3873cc595
         trigger_prototypes:
-        - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/raiddrive.predfail[{#SNMPINDEX}])>0
+        - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/raiddrive.predfail[{#SNMPINDEX}])>0
           name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): predictive failure count > 0'
           priority: HIGH
           description: The controller reported a predictive failure. Plan drive replacement.
           manual_close: 'YES'
-          uuid: 5813eb601b1941089a586868f47b60a9
+          uuid: 57a03a7fa0484d628382ff689fd35b0c
           dependencies:
           - name: Server is powered off
-            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.power.state)<>255
       - name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): Media error count'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.3.1.22.{#SNMPINDEX}
@@ -776,7 +834,7 @@ zabbix_export:
         tags:
         - tag: component
           value: disk
-        uuid: bce4b8607daf404696a1c50b2e380fd3
+        uuid: 23fc6af0381d4a43948057a20b84840e
       - name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): Remaining life'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.3.1.25.{#SNMPINDEX}
@@ -796,16 +854,16 @@ zabbix_export:
         tags:
         - tag: component
           value: disk
-        uuid: 110f5ecb279e44259115c958f9b2f74c
+        uuid: 18643b3b1d0246e59093bf13a1684cac
         trigger_prototypes:
-        - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/raiddrive.life[{#SNMPINDEX}])<{$DRIVE_LIFE_WARN}
+        - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/raiddrive.life[{#SNMPINDEX}])<{$DRIVE_LIFE_WARN}
           name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): SSD remaining life < {$DRIVE_LIFE_WARN}%'
           priority: WARNING
           manual_close: 'YES'
-          uuid: 58ac89708b734bfabec17e46d044b123
+          uuid: 35dab9db33014b55a9108737bc5896ee
           dependencies:
           - name: Server is powered off
-            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.power.state)<>255
       - name: 'Drive slot {#DRVSLOT} ({#DRVNAME}): Temperature'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.3.1.10.{#SNMPINDEX}
@@ -824,14 +882,14 @@ zabbix_export:
         tags:
         - tag: component
           value: disk
-        uuid: 8a506a07e919480b92d3ed4c8184abb1
+        uuid: ee54c668d104496aa3e0638b23147319
     - name: Power Supply Discovery
       type: SNMP_AGENT
       snmp_oid: discovery[{#PSUNAME},.1.3.6.1.4.1.19046.11.1.1.11.2.1.2]
       key: psu.discovery
       delay: 1h
       description: LENOVO-XCC-MIB::powerFruName
-      uuid: 089089471c0346e1b7d829fc3c3c95f3
+      uuid: 8f104400ff3447989f1bffa64299ca8a
       lifetime: 30d
       enabled_lifetime_type: DISABLE_NEVER
       item_prototypes:
@@ -851,13 +909,13 @@ zabbix_export:
         tags:
         - tag: component
           value: psu
-        uuid: f792ef4d00364842b5099393f3132616
+        uuid: a88597e11aee4eeea090266f07794849
         trigger_prototypes:
-        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/psu.status[{#SNMPINDEX}],,,"{$PSU_OK_STATUS}")=0
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/psu.status[{#SNMPINDEX}],,,"{$PSU_OK_STATUS}")=0
           name: 'PSU {#PSUNAME}: power supply is not in Normal state'
           priority: HIGH
           manual_close: 'YES'
-          uuid: a1a79e55a5294b509349ca60933c14b9
+          uuid: af61c21b0c8c49d9aa4cf7240e15239d
       - name: 'PSU {#PSUNAME}: Health code'
         type: DEPENDENT
         key: psu.health.code[{#SNMPINDEX}]
@@ -874,7 +932,7 @@ zabbix_export:
         tags:
         - tag: component
           value: psu
-        uuid: a783f2c88bd64f7b87dbe0c79bee5cb0
+        uuid: 37ed74bfeadb411f99fee3c4e7ffde15
       - name: 'PSU {#PSUNAME}: FRU name'
         type: SNMP_AGENT
         snmp_oid: .1.3.6.1.4.1.19046.11.1.1.11.2.1.2.{#SNMPINDEX}
@@ -890,7 +948,7 @@ zabbix_export:
         tags:
         - tag: component
           value: psu
-        uuid: dbc938a4f38b43e0b79fe37f66488112
+        uuid: 0042c8e5a63647d2bc9753d5b3884ec3
     - name: Network Adapter Discovery
       type: SNMP_AGENT
       snmp_oid: discovery[{#NETINDEX},1.3.6.1.4.1.19046.11.1.1.14.4.1.1,{#NETNAME},1.3.6.1.4.1.19046.11.1.1.14.4.1.2]
@@ -902,7 +960,7 @@ zabbix_export:
           value: '{$HBA_FC.NAME_MATCHES}'
           operator: NOT_MATCHES_REGEX
           formulaid: A
-      uuid: 5de53c444a93442da6dbe467d51b3177
+      uuid: a7b64259481c45ddb1ac5b8f52d33a20
       lifetime: 30d
       enabled_lifetime_type: DISABLE_NEVER
       item_prototypes:
@@ -920,14 +978,14 @@ zabbix_export:
         tags:
         - tag: component
           value: network
-        uuid: 7c2f7b7aadeb493686d7fc03188c1c15
+        uuid: 4a58c04855b64fb6a10352fed79cd190
         trigger_prototypes:
-        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/net.link.status[{#NETINDEX}],,,"Down")=1
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/net.link.status[{#NETINDEX}],,,"Down")=1
           name: 'NIC {#NETNAME}: link is Down'
           priority: AVERAGE
           description: Disable for ports intentionally left uncabled.
           manual_close: 'YES'
-          uuid: 949c12825be94f5d9528d37431caf493
+          uuid: 247fb0c8a0d54bcca74c889d11e9602e
       - name: 'NIC {#NETNAME}: Link speed'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.14.4.1.21.{#NETINDEX}
@@ -942,7 +1000,7 @@ zabbix_export:
         tags:
         - tag: component
           value: network
-        uuid: 989b0c8820d84959923deb88b26ad766
+        uuid: 1d1fd81403e4466fae7e6002f08e87ee
       - name: 'NIC {#NETNAME}: MAC (burned-in)'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.14.4.1.5.{#NETINDEX}
@@ -958,7 +1016,7 @@ zabbix_export:
         tags:
         - tag: component
           value: network
-        uuid: b7c1511bfc9e4335a6ed469f03fa11c8
+        uuid: ed631ccbca084e16892cd52ec7464f9e
     - name: HBA Fibre Channel Discovery
       type: SNMP_AGENT
       snmp_oid: discovery[{#HBAINDEX},1.3.6.1.4.1.19046.11.1.1.14.4.1.1,{#HBANAME},1.3.6.1.4.1.19046.11.1.1.14.4.1.2]
@@ -975,7 +1033,7 @@ zabbix_export:
           value: '{$HBA_FC.NAME_NOT_MATCHES}'
           operator: NOT_MATCHES_REGEX
           formulaid: B
-      uuid: fac65af9c24a48d7b3bbaae8ffaa5bb2
+      uuid: a00185b270144060a6427d7cf8da8545
       lifetime: 30d
       enabled_lifetime_type: DISABLE_NEVER
       item_prototypes:
@@ -993,13 +1051,13 @@ zabbix_export:
         tags:
         - tag: component
           value: hba-fc
-        uuid: 23c4c82837b543bba8e316f75aa5b5a2
+        uuid: e736cc85bafd47329aef7d7ac94fdb8d
         trigger_prototypes:
-        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/hba.fc.link.status[{#HBAINDEX}],,,"Down")=1
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/hba.fc.link.status[{#HBAINDEX}],,,"Down")=1
           name: 'HBA FC {#HBANAME}: link is Down'
           priority: AVERAGE
           manual_close: 'YES'
-          uuid: 0f939745a74449de965f7e39af5300ec
+          uuid: 10351cc3308a4846a23e9891f73f104a
       - name: 'HBA FC {#HBANAME}: Link speed'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.14.4.1.21.{#HBAINDEX}
@@ -1014,7 +1072,7 @@ zabbix_export:
         tags:
         - tag: component
           value: hba-fc
-        uuid: 32bc061912b34893914ce50276cc1f08
+        uuid: 3ac0ba0ada724fee8725168ddc4691e2
       - name: 'HBA FC {#HBANAME}: WWPN (FC address)'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.14.4.1.16.{#HBAINDEX}
@@ -1031,13 +1089,13 @@ zabbix_export:
         tags:
         - tag: component
           value: hba-fc
-        uuid: e015851319284f9aa7536b40c21a47df
+        uuid: 2448b4310e714eba81f6e00fd71c3d77
     - name: RAID Controller Discovery
       type: SNMP_AGENT
       snmp_oid: discovery[{#RAIDNAME},1.3.6.1.4.1.19046.11.1.1.13.1.2.1.2]
       key: raid.controller.discovery
       description: LENOVO-XCC-MIB::raidControllerTable
-      uuid: 53d225a8430e4685af22f9373a43b787
+      uuid: 03dd77b7452d477ab38e56ec7a61e851
       lifetime: 30d
       enabled_lifetime_type: DISABLE_NEVER
       item_prototypes:
@@ -1055,7 +1113,7 @@ zabbix_export:
         tags:
         - tag: component
           value: storage
-        uuid: dcbce56f3b6f43fdbb1dff54a4c0a79c
+        uuid: eeea36031460447c84d999dbd34438c6
       - name: 'RAID {#RAIDNAME}: Battery installed'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.2.1.5.{#SNMPINDEX}
@@ -1071,7 +1129,7 @@ zabbix_export:
         tags:
         - tag: component
           value: battery
-        uuid: ab221798d92c4b7babc29d518357f50c
+        uuid: a3f2a771a55f4238b7e9df1bfa3ad15f
       - name: 'RAID {#RAIDNAME}: Battery status'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.2.1.24.{#SNMPINDEX}
@@ -1087,15 +1145,15 @@ zabbix_export:
         tags:
         - tag: component
           value: battery
-        uuid: 0c487fbeb9194255821c3bedcaff5ffd
+        uuid: 0499c17c86f742f7a73a0704d1335dc7
         trigger_prototypes:
-        - expression: length(last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/raid.battery.status[{#SNMPINDEX}]))>0 and find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/raid.battery.status[{#SNMPINDEX}],,"iregexp","(optimal|normal|good|ok)")=0
+        - expression: length(last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/raid.battery.status[{#SNMPINDEX}]))>0 and find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/raid.battery.status[{#SNMPINDEX}],,"iregexp","(optimal|normal|good|ok)")=0
           name: 'RAID {#RAIDNAME}: battery status is not optimal'
           priority: AVERAGE
           description: 'Last value: {ITEM.LASTVALUE1}. If the controller has no battery by design, disable this trigger.'
           manual_close: 'YES'
           status: DISABLED
-          uuid: ec6ea43042354d869c9e7d5f05977cba
+          uuid: 4a7223f7e2c4402dab73fd63d8fa6063
       - name: 'RAID {#RAIDNAME}: Battery voltage'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.2.1.31.{#SNMPINDEX}
@@ -1115,7 +1173,7 @@ zabbix_export:
         tags:
         - tag: component
           value: battery
-        uuid: 0f28690fb1f84cc18e06caa7c00f9087
+        uuid: d334e64912554895acd6c357d2a233fc
       - name: 'RAID {#RAIDNAME}: Battery temperature'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.2.1.34.{#SNMPINDEX}
@@ -1135,7 +1193,7 @@ zabbix_export:
         tags:
         - tag: component
           value: battery
-        uuid: 5caf5e8819124271a4ca5ac879ce815d
+        uuid: 4c4c138b378745deb2470a9e848d8fe2
       - name: 'RAID {#RAIDNAME}: Firmware version'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.13.1.2.1.4.{#SNMPINDEX}
@@ -1150,7 +1208,7 @@ zabbix_export:
         tags:
         - tag: component
           value: storage
-        uuid: bc740da805474058b8ce31264ce1088b
+        uuid: 5a080ef4c44447a8bbfe8f17136558ac
     - name: Temperature Sensor Discovery
       type: SNMP_AGENT
       snmp_oid: discovery[{#TEMPDESCR},1.3.6.1.4.1.19046.11.1.1.1.2.1.2]
@@ -1163,7 +1221,7 @@ zabbix_export:
           value: '{$NAME.NOT_MATCHES}'
           operator: NOT_MATCHES_REGEX
           formulaid: A
-      uuid: 83adf828ae1649f49dcd5a4b70a6be18
+      uuid: 37c379487a8e4b8096f2adc2b9c584c5
       lifetime: 30d
       enabled_lifetime_type: DISABLE_NEVER
       item_prototypes:
@@ -1184,29 +1242,29 @@ zabbix_export:
         tags:
         - tag: component
           value: temperature
-        uuid: 3864c8b0e98b48deacc4bbefcb2aafbb
+        uuid: 081859fafe0b4f9ebbde63133c938052
         trigger_prototypes:
-        - expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/sensor.temp.value[{#TEMPDESCR}],5m)>{$TEMP_CRIT:""}
+        - expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/sensor.temp.value[{#TEMPDESCR}],5m)>{$TEMP_CRIT:""}
           recovery_mode: RECOVERY_EXPRESSION
-          recovery_expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/sensor.temp.value[{#TEMPDESCR}],5m)<{$TEMP_CRIT:""}-3
+          recovery_expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/sensor.temp.value[{#TEMPDESCR}],5m)<{$TEMP_CRIT:""}-3
           name: '{#TEMPDESCR}: temperature above critical threshold: >{$TEMP_CRIT:""}'
           priority: HIGH
           manual_close: 'YES'
-          uuid: 49536453d4e94938843e17851d89009b
-        - expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/sensor.temp.value[{#TEMPDESCR}],5m)>{$TEMP_WARN:""}
+          uuid: 8b09bbdcedb44fe4b272cc1871d13685
+        - expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/sensor.temp.value[{#TEMPDESCR}],5m)>{$TEMP_WARN:""}
           recovery_mode: RECOVERY_EXPRESSION
-          recovery_expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/sensor.temp.value[{#TEMPDESCR}],5m)<{$TEMP_WARN:""}-3
+          recovery_expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/sensor.temp.value[{#TEMPDESCR}],5m)<{$TEMP_WARN:""}-3
           name: '{#TEMPDESCR}: temperature above warning threshold: >{$TEMP_WARN:""}'
           priority: WARNING
           manual_close: 'YES'
-          uuid: 686fc51c7f2e42a9aa6fd152840a7bfb
+          uuid: b6bd195c8b404ae599ee2d9615c77e81
     - name: Voltage Sensor Discovery
       type: SNMP_AGENT
       snmp_oid: discovery[{#VOLTDESCR},1.3.6.1.4.1.19046.11.1.1.2.2.1.2]
       key: voltage.discovery
       delay: 1h
       description: LENOVO-XCC-MIB::voltDescr. The system (CMOS) battery usually appears here as a voltage sensor.
-      uuid: ac0a5e6098224a02bfad640117b3aa28
+      uuid: a3886aea3c0a4d37a79342ad84d38ba6
       lifetime: 30d
       enabled_lifetime_type: DISABLE_NEVER
       item_prototypes:
@@ -1228,7 +1286,7 @@ zabbix_export:
         tags:
         - tag: component
           value: voltage
-        uuid: a1f370b34b3a47f9abaa833eb7d98c14
+        uuid: 7326159214444f97a1e3c9ec274d1f13
       - name: '{#VOLTDESCR}: Status'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.2.2.1.11.{#SNMPINDEX}
@@ -1244,17 +1302,17 @@ zabbix_export:
         tags:
         - tag: component
           value: voltage
-        uuid: b1f435e7e43f4c1aa80a170ac0885545
+        uuid: cc6a4d5f870d43d9a1ae728378d1c49c
         trigger_prototypes:
-        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/sensor.voltage.status[{#VOLTDESCR}],,,"Normal")=0
+        - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/sensor.voltage.status[{#VOLTDESCR}],,,"Normal")=0
           name: '{#VOLTDESCR}: voltage/battery sensor is not in Normal state'
           priority: WARNING
           description: If the sensor is the system (CMOS) battery, this indicates a weak/missing battery.
           manual_close: 'YES'
-          uuid: 57102eea17df4487ba459fd92c3e3238
+          uuid: d412b3daa63248b78ec309aedc52aa0c
           dependencies:
           - name: Server is powered off
-            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+            expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.power.state)<>255
     - name: GPU Discovery (inventory)
       type: SNMP_AGENT
       snmp_oid: discovery[{#GPUINDEX},1.3.6.1.4.1.19046.11.1.1.14.5.1.1,{#GPUNAME},1.3.6.1.4.1.19046.11.1.1.14.5.1.2]
@@ -1267,7 +1325,7 @@ zabbix_export:
           value: '{$GPU.NAME_MATCHES}'
           operator: MATCHES_REGEX
           formulaid: A
-      uuid: 6ce445ea5f954925a4969c6bcdf4d82f
+      uuid: 93433966ba794798b709e506bdcc37da
       lifetime: 30d
       enabled_lifetime_type: DISABLE_NEVER
       item_prototypes:
@@ -1286,7 +1344,7 @@ zabbix_export:
         tags:
         - tag: component
           value: gpu
-        uuid: cfe53a947293409c80b6218b728cab52
+        uuid: cb7ebe708d264090bb13e17747cdbace
       - name: 'GPU {#GPUNAME}: Video memory size'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.14.5.1.12.{#GPUINDEX}
@@ -1302,13 +1360,13 @@ zabbix_export:
         tags:
         - tag: component
           value: gpu
-        uuid: 049eb7a2875243cf9d31f0bd37b282f8
+        uuid: 42229fd29e4142c3b20cca0209f96049
     - name: Firmware Inventory Discovery
       type: SNMP_AGENT
       snmp_oid: discovery[{#FWINDEX},1.3.6.1.4.1.19046.11.1.1.5.1.1.1,{#FWTYPE},1.3.6.1.4.1.19046.11.1.1.5.1.1.2]
       key: firmware.discovery
       delay: 1h
-      uuid: eb5591cda90248b9b6426f94b20f8d81
+      uuid: 0d4efce23d9e4aca9b0ea30fb9b42caf
       lifetime: 30d
       enabled_lifetime_type: DISABLE_NEVER
       item_prototypes:
@@ -1326,7 +1384,7 @@ zabbix_export:
         tags:
         - tag: component
           value: firmware
-        uuid: 4e4478f69aaf451ba0b4569371a17f47
+        uuid: 29435fcee3d542ae81b3bef8bc458bd7
       - name: 'Firmware {#FWTYPE}: Release date'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.5.1.1.4.{#FWINDEX}
@@ -1341,12 +1399,12 @@ zabbix_export:
         tags:
         - tag: component
           value: firmware
-        uuid: 41c7b3e136d14d168baf624d8e5005e6
+        uuid: 6541568a08c2432a94460bfd4a89267f
     - name: LED Status Discovery
       type: SNMP_AGENT
       snmp_oid: discovery[{#LEDINDEX},1.3.6.1.4.1.19046.11.1.1.8.2.1.1,{#LEDLABEL},1.3.6.1.4.1.19046.11.1.1.8.2.1.4]
       key: led.discovery
-      uuid: 2ef01786107d4eedac9a589a693c969b
+      uuid: 3a827ef61b4245ec8289c2682105af06
       lifetime: 30d
       enabled_lifetime_type: DISABLE_NEVER
       item_prototypes:
@@ -1365,7 +1423,7 @@ zabbix_export:
         tags:
         - tag: component
           value: led
-        uuid: 2e50ffbe75714bd4aaaf0bbc99352a54
+        uuid: 25330c4fc0fe466aae1b8c3ebc15e1a2
       - name: 'LED {#LEDLABEL}: Color'
         type: SNMP_AGENT
         snmp_oid: 1.3.6.1.4.1.19046.11.1.1.8.2.1.6.{#LEDINDEX}
@@ -1380,7 +1438,7 @@ zabbix_export:
         tags:
         - tag: component
           value: led
-        uuid: b724a1d761194f53b4e0511b2eabc53c
+        uuid: 1d2035aebd8848588698ba813887d0d0
     macros:
     - macro: '{$DISK_OK_STATUS}'
       value: Normal
@@ -1433,7 +1491,7 @@ zabbix_export:
       value: (?i)(critical|error|fail|fault|non-recover)
       description: Severity regex for XCC traps that should raise a HIGH alert.
     valuemaps:
-    - uuid: cbbef7b7bea243ed83131a513f67cc0f
+    - uuid: 9534fbaa41ad4301aa3cd05bd3b6bfc2
       name: systemHealthStat
       mappings:
       - value: '0'
@@ -1444,7 +1502,7 @@ zabbix_export:
         newvalue: nonCritical
       - value: '255'
         newvalue: normal
-    - uuid: 4354c89b30fe4e809384569f833167c3
+    - uuid: c1eb6d131f384f8a99053f66f82e37e0
       name: currentSysPowerStatus
       mappings:
       - value: '0'
@@ -1453,7 +1511,7 @@ zabbix_export:
         newvalue: sleepS3
       - value: '255'
         newvalue: poweredOn
-    - uuid: 98f3d981e312442ebd8497618592d008
+    - uuid: 76796d855bab424a8888e2cf10f48541
       name: ledstate
       mappings:
       - value: '0'
@@ -1462,7 +1520,7 @@ zabbix_export:
         newvalue: 'on'
       - value: '2'
         newvalue: blinking
-    - uuid: 991a937e1ef848289ef855a4382bcaa9
+    - uuid: 068c49f6820540a9b4285b1d415881a3
       name: raid ctrl batbck
       mappings:
       - value: '0'
@@ -1471,14 +1529,14 @@ zabbix_export:
         newvalue: installed
       - value: '2'
         newvalue: unknown
-    - uuid: 79de7aa446034348afe57877df19d0b5
+    - uuid: 89a1604d6013497a9d5c88f2e00bbdaf
       name: raidoobcapable
       mappings:
       - value: '0'
         newvalue: disabled
       - value: '1'
         newvalue: enabled
-    - uuid: 98f7953b066f4eaa9f25043c7d7b019f
+    - uuid: e885c298ab86438291a2af4fa821844d
       name: systemState
       mappings:
       - value: '0'
@@ -1501,7 +1559,7 @@ zabbix_export:
         newvalue: systemInLXPMMaintenanceMode
       - value: '9'
         newvalue: systemInMemoryTest
-    - uuid: 7d0fb7424e1a4e53a66f9c6c68f0b714
+    - uuid: ad0c14992bb04f9b9fccc283a7bd0d36
       name: snmp availability
       mappings:
       - value: '0'
@@ -1511,85 +1569,85 @@ zabbix_export:
       - value: '2'
         newvalue: unknown
   triggers:
-  - expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/icmpping,3m)=0
+  - expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/icmpping,3m)=0
     name: 'XCC: not responding to ICMP (unreachable)'
     priority: HIGH
     description: The XCC management IP has not answered ping for 3 minutes.
-    uuid: 0a2df973d5f243c69b690e5e47a1f923
-  - expression: min(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/icmppingloss,5m)>{$ICMP_LOSS_WARN}
+    uuid: 48ef998f44c448dd8fd08bc56df35c5d
+  - expression: min(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/icmppingloss,5m)>{$ICMP_LOSS_WARN}
     name: 'XCC: perda de pacotes ICMP alta (>{$ICMP_LOSS_WARN}%)'
     priority: WARNING
     dependencies:
     - name: 'XCC: not responding to ICMP (unreachable)'
-      expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/icmpping,3m)=0
-    uuid: 88c2c07f446845dbbfddaec59c53950d
-  - expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/zabbix[host,snmp,available],5m)=0
+      expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/icmpping,3m)=0
+    uuid: 32554ccdfa814ad1a6a18fa506a8f327
+  - expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/zabbix[host,snmp,available],5m)=0
     name: 'SNMP: XCC agent is not responding'
     priority: AVERAGE
     description: Zabbix flagged the SNMP interface as unavailable. Check credentials, the SNMP ACL on the XCC, and connectivity.
     dependencies:
     - name: 'XCC: not responding to ICMP (unreachable)'
-      expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/icmpping,3m)=0
-    uuid: ba8a562664fa480aab4ee9eeed974563
-  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.health.status)={$HEALTH_CRIT_STATUS} or last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.health.status)={$HEALTH_DISASTER_STATUS}
+      expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/icmpping,3m)=0
+    uuid: ad90d43f8c7349bc97c2e61f3cfc2aaa
+  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.health.status)={$HEALTH_CRIT_STATUS} or last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.health.status)={$HEALTH_DISASTER_STATUS}
     name: Overall system health is CRITICAL
     priority: HIGH
     manual_close: 'YES'
     dependencies:
     - name: Server is powered off
-      expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
-    uuid: feefc19e7854458da0d6712a0afed987
-  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.health.status)={$HEALTH_WARN_STATUS}
+      expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.power.state)<>255
+    uuid: 64e5db70954b4b57b26c7ee5b80c8af8
+  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.health.status)={$HEALTH_WARN_STATUS}
     name: Overall system health is degraded (non-critical)
     priority: WARNING
     manual_close: 'YES'
     dependencies:
     - name: Server is powered off
-      expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
-    uuid: d7802a35e53c4cccbb736415cc0386a1
-  - expression: nodata(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.health.status,{$SNMP.TIMEOUT})=1
+      expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.power.state)<>255
+    uuid: e5dd3e05820d48f2bf7d7d3fba51936f
+  - expression: nodata(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.health.status,{$SNMP.TIMEOUT})=1
     name: 'SNMP: no data from XCC for {$SNMP.TIMEOUT}'
     priority: AVERAGE
     description: No SNMP data received within the defined window. Distinguishes "component OK" from "polling stopped".
     dependencies:
     - name: 'SNMP: XCC agent is not responding'
-      expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/zabbix[host,snmp,available],5m)=0
+      expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/zabbix[host,snmp,available],5m)=0
     - name: 'XCC: not responding to ICMP (unreachable)'
-      expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/icmpping,3m)=0
-    uuid: 9d604348565d4fae952c995752172770
-  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/system.power.state)<>255
+      expression: max(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/icmpping,3m)=0
+    uuid: 3254486eabb84c4bbc4d1ca4ff2fb065
+  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/system.power.state)<>255
     name: Server is powered off
     priority: INFO
     description: currentSysPowerStatus indicates the server is not powered on (255=poweredOn). The XCC keeps answering SNMP. While active, this trigger suppresses component alerts (fan, overall health, etc.) to avoid false positives.
     manual_close: 'YES'
-    uuid: fb30c12ffec04cf79eaf58aa64f5f0e4
-  - expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/power.consumption,5m)>{$POWER_MAX}
+    uuid: 4a3716253c6244cd87c6bf63b1c043fb
+  - expression: avg(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/power.consumption,5m)>{$POWER_MAX}
     name: 'Power draw above threshold: >{$POWER_MAX}W'
     priority: WARNING
     description: 'Last value: {ITEM.LASTVALUE1}. Check workload and power-supply redundancy.'
     manual_close: 'YES'
-    uuid: 0432e1c3de014943a22d5e4f9da77dc8
-  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/psu.failed.count)>=1 and last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/psu.installed.count)>=2
+    uuid: 38ad26c8bae3481a93d07ca12a949d4a
+  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/psu.failed.count)>=1 and last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/psu.installed.count)>=2
     name: 'PSU: redundancy lost (one or more supplies degraded)'
     priority: HIGH
     description: With 2+ supplies installed, at least one is not in Normal state - the system has lost N+N redundancy.
     manual_close: 'YES'
-    uuid: ebd11952769f4fe295a613ccc3b2048e
-  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/raid.oob_capable)=0
+    uuid: d8df69b076eb4dacbc11bf65b12b73dd
+  - expression: last(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/raid.oob_capable)=0
     name: RAID Out-of-band monitoring is disabled on the XCC
     priority: INFO
     description: Enable it under BMC Configuration > Storage in the XCC to collect disks and controllers.
     manual_close: 'YES'
-    uuid: 0fbd69b646eb4003a2c9ddf0f07ae3e0
-  - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/snmptrap["Lenovo XCC"],,"iregexp","{$TRAP.SEVERITY_MATCHES}")=1
+    uuid: 83a251ecbc1f4964965f624bd21a81cb
+  - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/snmptrap["Lenovo XCC"],,"iregexp","{$TRAP.SEVERITY_MATCHES}")=1
     name: High-severity trap received from XCC
     priority: HIGH
     description: 'Last trap: {ITEM.LASTVALUE1}. Trap whose text matched {$TRAP.SEVERITY_MATCHES}.'
     manual_close: 'YES'
-    uuid: bda4fc8ec995465c823e3d20202f0d29
-  - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665 by XCC SNMP/snmptrap["Lenovo XCC"],,"iregexp","(?i)(warning|non-critical|degrad)")=1
+    uuid: ce36946b31b748da9d0ba29325c9247b
+  - expression: find(/Lenovo ThinkSystem SR630-SR650-SR655-SR665-HX650-VX650 by XCC SNMP/snmptrap["Lenovo XCC"],,"iregexp","(?i)(warning|non-critical|degrad)")=1
     name: Warning trap received from XCC
     priority: WARNING
     description: 'Last trap: {ITEM.LASTVALUE1}.'
     manual_close: 'YES'
-    uuid: 69dde0f3917b4440bc21b54c111a8c41
+    uuid: c65ecbec6b504c13b15c13b473a13557
